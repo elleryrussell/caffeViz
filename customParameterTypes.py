@@ -6,7 +6,7 @@ from pyqtgraph.parametertree.parameterTypes import GroupParameter, registerParam
 __author__ = 'ellery'
 
 
-class LayerParameter(Parameter):
+class LParameter(Parameter):
     def create(**opts):
         fd = opts.get('fieldDescriptor', None)
         if fd is None:
@@ -15,7 +15,7 @@ class LayerParameter(Parameter):
             typ = typeDict[fd.cpp_type]
             label = fd.label
             if label == 3:
-                cls = PARAM_TYPES['layerGroup']
+                cls = PARAM_TYPES['repeated']
             else:
                 cls = PARAM_TYPES[opts[typ]]
         return cls(**opts)
@@ -31,13 +31,13 @@ class LayerParameter(Parameter):
         Parameter.__init__(self, name=name, default=default, expanded=expanded, **opts)
 
 
-class layerGroupParameter(GroupParameter, LayerParameter):
+class LRepeatedParameter(GroupParameter, LParameter):
     def __init__(self, **kwargs):
         GroupParameter.__init__(self, addText='add', **kwargs)
 
     def addNew(self, value=None, default=None):
         name = self.name() + str(len(self.childs) + 1)
-        child = LayerParameter.create(name=name, fieldDescriptor=self.fieldDescriptor, value=value, default=default,
+        child = LParameter.create(name=name, fieldDescriptor=self.fieldDescriptor, value=value, default=default,
                                       removable=True, renamable=True)
 
         return self.addChild(child=child)
@@ -61,13 +61,14 @@ class layerGroupParameter(GroupParameter, LayerParameter):
         return [child.value() for child in self.children()]
 
 
-registerParameterType('layerGroup', layerGroupParameter)
+registerParameterType('repeated', LRepeatedParameter)
 
 
-class messageGroupParameter(GroupParameter, LayerParameter):
+class LMessageParameter(GroupParameter, LParameter):
     def __init__(self, value=None, fieldDescriptor=None, **kwargs):
         self.message_type = self.fieldDescriptor.message_type
-        children = [LayerParameter.create(fieldDescriptor=mfield) for mfield in self.message_type.fields]
+        children = [LParameter.create(fieldDescriptor=mfield) for mfield in self.message_type.fields
+                    if '_param' not in mfield.name]
 
         GroupParameter.__init__(self, children=children, **kwargs)
         # if self.value() is not None:
@@ -93,19 +94,19 @@ class messageGroupParameter(GroupParameter, LayerParameter):
         #         child.setValue(value.name.value)
 
 
-registerParameterType('message', messageGroupParameter)
+registerParameterType('message', LMessageParameter)
 
 
-class defaultParam(SimpleParameter, LayerParameter):
+class LDefaultParam(SimpleParameter, LParameter):
     def __init__(self, value=None, default=None, *args, **kwargs):
         SimpleParameter.__init__(self, value=value, default=default, *args, **kwargs)
         self.setDefault(default)
         self.setValue(value)
 
 
-registerParameterType('int', defaultParam, override=True)
-registerParameterType('float', defaultParam, override=True)
-registerParameterType('str', defaultParam, override=True)
+registerParameterType('int', LDefaultParam, override=True)
+registerParameterType('float', LDefaultParam, override=True)
+registerParameterType('str', LDefaultParam, override=True)
 
 
 class enumParameter(ListParameter):
@@ -148,7 +149,7 @@ typeDict = {
 #         opts = {'type': 'list', 'limits': {value.name:value.number for value in fd.enum_type.values}}
 #     # repeated field container
 #     elif fd.label == 3:
-#         opts = {'type': 'layerGroup', 'addText': 'add', 'field': fd, 'subTyp':ftype}
+#         opts = {'type': 'repeated', 'addText': 'add', 'field': fd, 'subTyp':ftype}
 #         # if ftype == 'message':
 #             # subParamList = [makeParamList(mfield) for mfield in fd.message_type.fields]
 #             # opts['subParamList'] = subParamList
