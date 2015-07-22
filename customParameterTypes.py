@@ -1,12 +1,28 @@
 from collections import OrderedDict
+from google.protobuf.descriptor_pb2 import FieldDescriptorProto
+from google.protobuf.message import Message
 
-from pyqtgraph.parametertree.Parameter import Parameter, PARAM_TYPES
-from pyqtgraph.parametertree.parameterTypes import GroupParameter, registerParameterType, SimpleParameter, ListParameter
+from pyqtgraph import QtCore
+
+from pyqtgraph.parametertree.Parameter import Parameter
+from pyqtgraph.parametertree.parameterTypes import GroupParameter, SimpleParameter, ListParameter
 
 __author__ = 'ellery'
 
+LPARAM_TYPES = {}
+LPARAM_NAMES = {}
+
+def registerLParameterType(name, cls, override=False):
+    global LPARAM_TYPES
+    if name in LPARAM_TYPES and not override:
+        raise Exception("Parameter type '%s' already exists (use override=True to replace)" % name)
+    LPARAM_TYPES[name] = cls
+    LPARAM_NAMES[cls] = name
+
 
 class LParameter(Parameter):
+
+    @staticmethod
     def create(**opts):
         fd = opts.get('fieldDescriptor', None)
         if fd is None:
@@ -14,33 +30,53 @@ class LParameter(Parameter):
         else:
             typ = typeDict[fd.cpp_type]
             label = fd.label
-            if label == 3:
-                cls = PARAM_TYPES['repeated']
+            if label == 3 and opts.get('repeated', True) is True:
+                cls = LPARAM_TYPES['repeated']
             else:
-                cls = PARAM_TYPES[opts[typ]]
+                cls = LPARAM_TYPES[typ]
         return cls(**opts)
 
     def __init__(self, fieldDescriptor=None, **opts):
         assert fieldDescriptor is not None
         self.fieldDescriptor = fieldDescriptor
 
-        name = fieldDescriptor.name
+        type = typeDict[fieldDescriptor.cpp_type]
+        if 'name' not in opts.keys():
+            opts['name'] = fieldDescriptor.name
         default = fieldDescriptor.default_value
-        expanded = False
+        if 'expanded' not in opts.keys():
+            opts['expanded'] = False
 
-        Parameter.__init__(self, name=name, default=default, expanded=expanded, **opts)
+        Parameter.__init__(self, default=default, type=type, **opts)
+
+    # def protoValue(self):
+    #     if not self.valueIsDefault():
+    #         protoMessage = self.fieldDescriptor.name
 
 
 class LRepeatedParameter(GroupParameter, LParameter):
-    def __init__(self, **kwargs):
-        GroupParameter.__init__(self, addText='add', **kwargs)
+    # sigChildAdded = QtCore.Signal(object, object) # self, child
 
-    def addNew(self, value=None, default=None):
+    def __init__(self, **kwargs):
+        LParameter.__init__(self, **kwargs)
+        GroupParameter.__init__(self, addText='add', **self.opts)
+        self.opts['type'] = 'repeated'
+
+    def addNew(self, value=None):
         name = self.name() + str(len(self.childs) + 1)
-        child = LParameter.create(name=name, fieldDescriptor=self.fieldDescriptor, value=value, default=default,
+        fd = self.fieldDescriptor
+        child = LParameter.create(name=name, repeated=False, fieldDescriptor=fd, value=value,
                                       removable=True, renamable=True)
 
+        # self.sigChildAdded.emit(self, child, pos)
         return self.addChild(child=child)
+
+    def setValue(self, value, blockSignal=None, clear=False):
+        if clear:
+            self.clearChildren()
+        for spec in value:
+            child = self.addNew()
+            child.setValue(spec)
 
     def valueIsDefault(self):
         """if child has any children always return True"""
@@ -60,17 +96,22 @@ class LRepeatedParameter(GroupParameter, LParameter):
     def value(self):
         return [child.value() for child in self.children()]
 
+    def protoValue(self):
+        for val in self.value():
+            pass
 
-registerParameterType('repeated', LRepeatedParameter)
+
+registerLParameterType('repeated', LRepeatedParameter)
 
 
 class LMessageParameter(GroupParameter, LParameter):
-    def __init__(self, value=None, fieldDescriptor=None, **kwargs):
+    def __init__(self, value=None, **kwargs):
+        LParameter.__init__(self, **kwargs)
         self.message_type = self.fieldDescriptor.message_type
         children = [LParameter.create(fieldDescriptor=mfield) for mfield in self.message_type.fields
                     if '_param' not in mfield.name]
 
-        GroupParameter.__init__(self, children=children, **kwargs)
+        GroupParameter.__init__(self, children=children, **self.opts)
         # if self.value() is not None:
         #     paramsList = makeParamList(self.value())
         #     self.addChild(paramsList)
@@ -89,44 +130,67 @@ class LMessageParameter(GroupParameter, LParameter):
         childList = [(child.name(), child.value()) for child in self.children() if not child.valueIsDefault()]
         return childList
 
+    def setValue(self, value, blockSignal=None):
+        spec = value
+        for field, value in spec.ListFields():
+            self.child(field.name).setValue(value)
+            # pass
+
+    def proto(self):
+        fd = self.fieldDescriptor
+        assert isinstance(fd, FieldDescriptorProto)
+
         # def setValue(self, value, blockSignal=None):
         #     for child in self.children():
         #         child.setValue(value.name.value)
 
 
-registerParameterType('message', LMessageParameter)
+registerLParameterType('message', LMessageParameter)
 
 
 class LDefaultParam(SimpleParameter, LParameter):
-    def __init__(self, value=None, default=None, *args, **kwargs):
-        SimpleParameter.__init__(self, value=value, default=default, *args, **kwargs)
-        self.setDefault(default)
-        self.setValue(value)
+    def __init__(self, *args, **kwargs):
+        LParameter.__init__(self, *args, **kwargs)
+        SimpleParameter.__init__(self, *args, **self.opts)
+        # self.setDefault(default)
+        # self.setValue(value)
 
 
-registerParameterType('int', LDefaultParam, override=True)
-registerParameterType('float', LDefaultParam, override=True)
-registerParameterType('str', LDefaultParam, override=True)
+registerLParameterType('int', LDefaultParam, override=True)
+registerLParameterType('float', LDefaultParam, override=True)
+registerLParameterType('str', LDefaultParam, override=True)
+registerLParameterType('bool', LDefaultParam, override=True)
 
 
-class enumParameter(ListParameter):
+class enumParameter(ListParameter, LParameter):
     def __init__(self, **opts):
-        assert 'fieldDescriptor' in opts.keys()
-        fd = opts['fieldDescriptor']
+        LParameter.__init__(self, **opts)
+        opts = self.opts
+        fd = self.fieldDescriptor
 
         limits = OrderedDict()
         if not fd.has_default_value:
-            limits['None'] = None
+            limits['None'] = -1
+            opts['default'] = -1
+        else:
+            opts['default'] = fd.default_value
         for value in fd.enum_type.values:
             limits[value.name] = value.number
         opts['limits'] = limits
 
-        opts['default'] = fd.default_value
+
 
         ListParameter.__init__(self, **opts)
 
+    def setValue(self, value, blockSignal=None):
+        if isinstance(value, Message):
+            val = value.number
+        else:
+            val = value
+        ListParameter.setValue(self, val)
 
-registerParameterType('enum', enumParameter)
+
+registerLParameterType('enum', enumParameter)
 
 typeDict = {
     1: 'int',
@@ -141,30 +205,3 @@ typeDict = {
     10: 'message'}
 
 
-# def makeParamList(fd, value=None):
-#     # name = fd.name
-#     ftype = typeDict[fd.cpp_type]
-#
-#     if ftype == 'enum':
-#         opts = {'type': 'list', 'limits': {value.name:value.number for value in fd.enum_type.values}}
-#     # repeated field container
-#     elif fd.label == 3:
-#         opts = {'type': 'repeated', 'addText': 'add', 'field': fd, 'subTyp':ftype}
-#         # if ftype == 'message':
-#             # subParamList = [makeParamList(mfield) for mfield in fd.message_type.fields]
-#             # opts['subParamList'] = subParamList
-#     elif ftype == 'message':
-#         opts = {'type': 'group', 'children': [makeParamList(mfield) for mfield in fd.message_type.fields]}
-#     else:
-#         opts = {'type': ftype}
-#
-#     if fd.has_default_value:
-#         opts['value'] = fd.default_value
-#         opts['default'] = fd.default_value
-#     elif ftype != 'message':
-#         opts['value'] = None
-#         opts['default'] = None
-#
-#     opts['name'] = fd.name
-#     opts['expanded'] = False
-#     return opts
