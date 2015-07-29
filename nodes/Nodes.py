@@ -1,4 +1,4 @@
-from caffe.proto.caffe_pb2 import LayerParameter as LayerProto, NetParameter
+from caffe.proto.caffe_pb2 import LayerParameter as LayerProto, NetParameter, V1LayerParameter
 from caffe import Layer
 from google.protobuf.internal.containers import RepeatedCompositeFieldContainer
 
@@ -10,13 +10,14 @@ __author__ = 'ellery'
 # from caffe.proto import caffe_pb2
 from caffe.net_spec import _param_names
 
+_param_names['Deconvolution']='convolution'
+
 from pyqtgraph.flowchart import Node
 import pyqtgraph.flowchart.library as fclib
 import pyqtgraph.parametertree as ptree
 from utils import slotDisconnected, signalsBlocked
 from pyqtgraph.Qt import QtGui, QtCore
 import pyqtgraph as pg
-
 
 # import numpy as np
 
@@ -36,7 +37,7 @@ class LayerNode(Node):
             param.setToDefault()
         t = ptree.ParameterTree()
         t.addParameters(self.param, depth=1, showTop=False)
-        self.proto = LayerProto
+        self.proto = LayerProto()
         self.specificParam = None
         self.baseParam = None
         self.sigRenamed.connect(self.nameChanged)
@@ -77,26 +78,27 @@ class LayerNode(Node):
         print layerSpec
         # get type for specific param
         self.proto = layerSpec
-        assert isinstance(layerSpec, LayerProto)
+        assert isinstance(layerSpec, (LayerProto, V1LayerParameter))
         layerType = layerSpec.type
-        try:
-            Layer(layerSpec)
-        except:
-            pass
 
-        self.updateSpecificParam(layerType)
+        if isinstance(layerSpec, V1LayerParameter):
+            enumVals = layerSpec.DESCRIPTOR.enum_types_by_name['LayerType'].values_by_number
+            typeName = enumVals[layerType].name
+            self.updateSpecificParam(typeName.capitalize())
+        else:
+            self.updateSpecificParam(layerType)
 
         self.updateParamList(self.proto)
         self.updateTerminals()
         self.connectParamTree()
 
+        self.updateProto()
+
     def connectParamTree(self):
         self.param.sigTreeStateChanged.connect(self.paramTreeChanged)
         self.param.sigTreeStateChanged.connect(self.updateProto)
 
-    def updateParamList(self, layerSpec, path=()):
-        # replace this all with self.param.setValue(layerSpec)
-
+    def updateParamList(self, layerSpec):
         self.param.setValue(layerSpec)
 
     def updateTerminals(self):
@@ -137,9 +139,9 @@ class LayerNode(Node):
         layerSpec = LayerProto()
         for param in self.param.children():
             assign_proto(layerSpec, param)
-        print layerSpec
+        # print layerSpec
         self.proto = layerSpec
-        self.sigProtoChanged.emit()
+        self.sigProtoChanged.emit(self)
 
     def nameChanged(self):
         with signalsBlocked(self.param):
@@ -197,7 +199,7 @@ LayerTypes = ['AbsVal', 'Accuracy', 'ArgMax', 'BNLL', 'Concat', 'ContrastiveLoss
               'HDF5Data', 'HDF5Output', 'HingeLoss', 'Im2col', 'ImageData', 'InfogainLoss', 'InnerProduct', 'LRN',
               'Log', 'MVN', 'MemoryData', 'MultinomialLogisticLoss', 'PReLU', 'Pooling', 'Power', 'Python', 'ReLU',
               'Reduction', 'Reshape', 'SPP', 'Sigmoid', 'SigmoidCrossEntropyLoss', 'Silence', 'Slice', 'Softmax',
-              'SoftmaxWithLoss', 'Split', 'TanH', 'Threshold', 'WindowData']
+              'SoftmaxWithLoss', 'Split', 'TanH', 'Threshold', 'WindowData', 'Crop']
 
 
 # def generateProto(self, proto, param):
@@ -233,8 +235,8 @@ def assign_proto(proto, param):
                 proto_item = getattr(proto, param.name()).add()
                 for grandchild in child.children():
                     assign_proto(proto_item, grandchild)
-            else:
-                getattr(proto, param.name()).extend([child.value() for child in children if not child.valueIsDefault()])
+            elif not child.valueIsDefault():
+                getattr(proto, param.name()).extend([child.value()])
                 # message type
     elif param.type() == 'message':
         for childParam in param.children():

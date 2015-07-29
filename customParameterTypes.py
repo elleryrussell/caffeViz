@@ -79,7 +79,7 @@ class LRepeatedParameter(GroupParameter, LParameter):
             child.setValue(spec)
 
     def valueIsDefault(self):
-        """if child has any children always return True"""
+        """if child has any children always return False"""
         if len(self.children()) > 0:
             return False
         else:
