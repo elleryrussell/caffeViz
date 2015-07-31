@@ -1,4 +1,4 @@
-from caffeViz.Views import Ui_tabWidget
+from caffeViz.Views.MainViewTemplate import Ui_tabWidget
 from caffeViz.flowcharts.flowcharts import NetFlowchart
 
 __author__ = 'err258'
