@@ -16,4 +16,11 @@ class NetConnectionItem(ConnectionItem):
 
 class NetTerminal(Terminal):
     def name(self):
-        return self._name[:len('.o')]
+        print self._name[:-len('.o')]
+        return self._name[:-len('.o')]
+
+    def rename(self, name):
+        oldName = self._name
+        self._name = name + oldName[-len('.o'):]
+        self.node().terminalRenamed(self, oldName)
+        self.graphicsItem().termRenamed(name)
