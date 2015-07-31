@@ -1,5 +1,5 @@
-from Views.MainViewTemplate import Ui_tabWidget
-from flowcharts.flowcharts import NetFlowchart
+from caffeViz.Views import Ui_tabWidget
+from caffeViz.flowcharts.flowcharts import NetFlowchart
 
 __author__ = 'err258'
 
@@ -106,7 +106,12 @@ if __name__ == '__main__':
     # # w.chartWidget.moveDock()
     # win.show()
 
-    model_dir = '/Users/err258/caffe/models/'
+    import os.path
+
+    base_path = os.path.expanduser('~')
+    model_dir = base_path + '/caffe/models/'
+    # model_dir = '/Users/err258/caffe/models/'
+    # model_dir = '/
     # net_dir = 'bvlc_reference_caffenet/'
     net_dir = '91eece041c19ff8968ee/'
     dir = model_dir + net_dir

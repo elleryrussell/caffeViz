@@ -1,9 +1,8 @@
 from caffe.proto.caffe_pb2 import LayerParameter as LayerProto, NetParameter, V1LayerParameter
-from caffe import Layer
-from google.protobuf.internal.containers import RepeatedCompositeFieldContainer
+from caffeViz import netTerminal
 
-import customParameterTypes
-from customParameterTypes import LParameter
+from caffeViz.customParameterTypes import LParameter
+from caffeViz.netTerminal import NetTerminal
 
 __author__ = 'ellery'
 
@@ -15,8 +14,8 @@ _param_names['Deconvolution']='convolution'
 from pyqtgraph.flowchart import Node
 import pyqtgraph.flowchart.library as fclib
 import pyqtgraph.parametertree as ptree
-from utils import slotDisconnected, signalsBlocked
-from pyqtgraph.Qt import QtGui, QtCore
+from ..utils import slotDisconnected, signalsBlocked
+from pyqtgraph.Qt import QtCore
 import pyqtgraph as pg
 
 # import numpy as np
@@ -113,14 +112,44 @@ class LayerNode(Node):
 
     def addInput(self, name="Input", **args):
         args.update(multi=True)
+        name = name+'.i'
         Node.addInput(self, name=name, **args)
 
-    # def addOutput(self, name="Output", **args):
-    #     Node.addOutput(self, name=name, **args)
+    def addOutput(self, name="Output", **args):
+        name = name + '.o'
+        Node.addOutput(self, name=name, **args)
 
     def addTerminal(self, name, **opts):
+        """Add a new terminal to this Node with the given name. Extra
+        keyword arguments are passed to Terminal.__init__.
+
+        Causes sigTerminalAdded to be emitted."""
         opts.update(renamable=True, removable=True)
-        Node.addTerminal(self, name, **opts)
+        name = self.nextTerminalName(name)
+        term = NetTerminal(self, name, **opts)
+        self.terminals[name] = term
+        if term.isInput():
+            self._inputs[name] = term
+        elif term.isOutput():
+            self._outputs[name] = term
+        self.graphicsItem().updateTerminals()
+        self.sigTerminalAdded.emit(self, term)
+        return term
+
+    def terminalRenamed(self, term, oldName):
+        """Called after a terminal has been renamed
+
+        Causes sigTerminalRenamed to be emitted."""
+        newName = term._name
+        for d in [self.terminals, self._inputs, self._outputs]:
+            if oldName not in d:
+                continue
+            d[newName] = d[oldName]
+            del d[oldName]
+
+        self.graphicsItem().updateTerminals()
+        self.sigTerminalRenamed.emit(term, oldName)
+
 
     def paramTreeChanged(self, topParam, changes):
         for childParam, change, value in changes:
@@ -178,6 +207,8 @@ class LayerNode(Node):
         if 'Loss' in layerType:
             additionalParamName = 'loss_param'
             self.addAdditionalParam(additionalParamName)
+
+        self.nodeName = layerType
 
     def addAdditionalParam(self, name):
         additionalFieldDescriptor = self.proto.DESCRIPTOR.fields_by_name[name]
@@ -254,13 +285,15 @@ def assign_proto(proto, param):
         # return proto
 
 
-library = fclib.LIBRARY.copy()
-library.addNodeType(LayerNode, [('Layers',)])
+fclib.registerNodeType(LayerNode, [('Layers',)])
+
+# library = fclib.LIBRARY.copy()
+# library.addNodeType(LayerNode, [('Layers',)])
 
 for layerType in LayerTypes:
     class ANode(LayerNode):
         nodeName = layerType
-    library.addNodeType(ANode, [('Layers',)])
+    fclib.registerNodeType(ANode, [('Layers',)])
 
 # layerTypes =
 

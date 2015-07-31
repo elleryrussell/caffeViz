@@ -1,20 +1,19 @@
-from pyqtgraph.flowchart.Flowchart import Flowchart, FlowchartWidget, FlowchartCtrlWidget, FlowchartCtrlTemplate
-from pyqtgraph.flowchart.FlowchartCtrlTemplate_pyqt import _fromUtf8
-from pyqtgraph.flowchart.Terminal import ConnectionItem, Terminal
-from NetTerminal import NetConnectionItem
-from pyqtgraph.parametertree import ParameterTree, Parameter
-from caffe.proto.caffe_pb2 import LayerParameter as LayerProto, NetParameter as NetProto
-from pyqtgraph.functions import toposort
-
 import inspect
 
-from pyqtgraph.flowchart.library import Display
-displayNodes = tuple(obj for name, obj in inspect.getmembers(Display) if inspect.isclass(obj))
+from pyqtgraph.flowchart.Flowchart import Flowchart, FlowchartWidget
+from pyqtgraph.flowchart.Terminal import Terminal
+from caffe.proto.caffe_pb2 import NetParameter as NetProto
+from pyqtgraph.functions import toposort
+from pyqtgraph.flowchart.library import getNodeTree
+
+from caffeViz.netTerminal import NetConnectionItem
+
+import caffeViz.nodes
+displayNodes = tuple(getNodeTree()['Display'].values())
 
 from pyqtgraph.widgets.FileDialog import FileDialog
 
-import sip
-from nodes.Nodes import LayerNode
+from caffeViz.nodes.LayerNodes import LayerNode
 
 __author__ = 'ellery'
 
@@ -22,7 +21,7 @@ from pyqtgraph.Qt import QtGui, QtCore
 from google.protobuf import text_format
 import caffe
 
-from nodes import Nodes
+from caffeViz.nodes import LayerNodes
 
 
 def _readProtoNetFile(filepath):
@@ -79,7 +78,7 @@ class NetFlowchart(Flowchart):
 
         for proto in self.layerList:
             print proto
-        self.setLibrary(Nodes.library)
+        # self.setLibrary(LayerNodes.library)
         self.initNodes()
 
         self.configNodes()
@@ -147,15 +146,17 @@ class NetFlowchart(Flowchart):
         # connect node to first preceding node with same name
         for i, node in enumerate(self.nodeList[1:]):
             # iphase = node.phase()
-            for iname, iTerm in node.inputs().items():
+            for iTerm in node.inputs().values():
+                iname = iTerm.name()
                 # iTerm.disconnectAll()
                 # doBreak = False
                 for previousNode in self.nodeList[i::-1]:
                     # ophase = previousNode.phase()
-                    for oname, output in previousNode.outputs().items():
+                    for output in previousNode.outputs().values():
+                        oname = output.name()
                         assert isinstance(output, Terminal)
                         assert isinstance(iTerm, Terminal)
-                        if iname in oname:
+                        if iname == oname:
                             color = self.getConnectionColor(iTerm, previousNode)
                             # doBreak = True
                             #     color = self.getConnectionColor(iphase, ophase)
@@ -212,7 +213,8 @@ class NetFlowchart(Flowchart):
         deps = {}
         # tdeps = {}   ## {terminal: [nodes that depend on terminal]}
         for name, node in self._nodes.items():
-            deps[node] = node.dependentNodes()
+            if isinstance(node, LayerNode):
+                deps[node] = node.dependentNodes()
             # for t in node.outputs().values():
             #     tdeps[t] = t.dependentNodes()
 

@@ -13,3 +13,7 @@ class NetConnectionItem(ConnectionItem):
         else:
             path = ConnectionItem.generatePath(self, start, stop)
         return path
+
+class NetTerminal(Terminal):
+    def name(self):
+        return self._name[:len('.o')]
