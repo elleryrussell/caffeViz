@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
 
-# Form implementation generated from reading ui file 'mainview.ui'
+# Form implementation generated from reading ui file 'MainView.ui'
 #
-# Created: Wed Jul 29 01:41:57 2015
+# Created: Fri Jul 31 21:59:27 2015
 #      by: PyQt4 UI code generator 4.10.4
 #
 # WARNING! All changes made in this file will be lost!
