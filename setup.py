@@ -9,5 +9,5 @@ setup(
     author='ellery',
     author_email='ellery.rrussell@gmail.com',
     description='tools for caffe',
-    requires=['caffe']
+    requires=['caffe', 'toposort']
 )
