@@ -1,4 +1,5 @@
-from caffeViz.Views.MainViewTemplate import Ui_tabWidget
+from caffeViz.Views import MainViewTemplate as MView
+from caffeViz.Views import DisplayControlWidgetTemplate as DispCtrl
 from caffeViz.flowcharts.flowcharts import NetFlowchart
 
 __author__ = 'err258'
@@ -24,7 +25,7 @@ class MainView(QtGui.QMainWindow):
         self.tabWidget = QtGui.QTabWidget()
         self.tabWidget.setSizePolicy(QtGui.QSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Expanding))
 
-        self.ui = Ui_tabWidget()
+        self.ui = MView.Ui_tabWidget()
         self.ui.setupUi(self.tabWidget)
 
         cw = QtGui.QWidget()
@@ -63,6 +64,17 @@ class MainView(QtGui.QMainWindow):
         self.tabWidget.setCurrentIndex(0)
         self.fc.sigDisplayNodeAdded.connect(self.addPlot)
 
+        self.displayControlDock = pg.dockarea.Dock('Control')
+        formWidget = pg.QtGui.QWidget()
+        displayCtrlUi = DispCtrl.Ui_displayControlWidget()
+        displayCtrlUi.setupUi(formWidget)
+        displayCtrlUi.previousBtn.clicked.connect(self.updateDisplay)
+        displayCtrlUi.updateBtn.clicked.connect(self.updateDisplay)
+        displayCtrlUi.nextBtn.clicked.connect(self.updateDisplay)
+
+        self.displayControlDock.addWidget(formWidget)
+        self.ui.displayArea.addDock(self.displayControlDock, position='top')
+
     def tabChanged(self, tabIndex):
         if tabIndex == 0:
             self.setTab0()
@@ -99,6 +111,15 @@ class MainView(QtGui.QMainWindow):
         for name, plotNode in self.plotNodes.items():
             plotNode.setPlotList(self.plots)
 
+    def updateDisplay(self):
+        sender = self.sender()
+        if sender.objectName() == u'previousBtn':
+            self.selectInput(-1)
+        elif sender.objectName() == u'nextBtn':
+            self.selectInput(1)
+        self.fc.process()
+
+
 
 if __name__ == '__main__':
     pg.mkQApp()  # layout.addWidget(w)
@@ -110,22 +131,24 @@ if __name__ == '__main__':
 
     base_path = os.path.expanduser('~')
     model_dir = base_path + '/caffe/models/'
-    # model_dir = '/Users/err258/caffe/models/'
-    # model_dir = '/
+
     # net_dir = 'bvlc_reference_caffenet/'
     net_dir = '91eece041c19ff8968ee/'
+
     dir = model_dir + net_dir
-    # model_path = '/train_val.prototxt'
+
     model_path = 'train_val.prototxt'
 
     weights_path = 'fcn-8s-pascalcontext.caffemodel'
-    # rel_path = 'bvlc_reference_caffenet/deploy.prototxt'
+    # weights_path = 'bvlc_reference_caffenet.caffemodel'
+
     model_file = dir + model_path
 
     weights_file = dir + weights_path
 
     win = MainView(model_file, weights_file=weights_file)
     win.show()
+
 
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         QtGui.QApplication.instance().exec_()

@@ -16,7 +16,7 @@ class NetConnectionItem(ConnectionItem):
 
 class NetTerminal(Terminal):
     def name(self):
-        print self._name[:-len('.o')]
+        # print self._name[:-len('.o')]
         return self._name[:-len('.o')]
 
     def rename(self, name):

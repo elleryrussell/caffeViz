@@ -1,9 +1,10 @@
 import inspect
+from tempfile import NamedTemporaryFile
 
 from pyqtgraph.flowchart.Flowchart import Flowchart, FlowchartWidget
 from pyqtgraph.flowchart.Terminal import Terminal
 from caffe.proto.caffe_pb2 import NetParameter as NetProto
-from pyqtgraph.functions import toposort
+import toposort
 from pyqtgraph.flowchart.library import getNodeTree
 
 from caffeViz.netTerminal import NetConnectionItem
@@ -55,6 +56,7 @@ class NetFlowchart(Flowchart):
     def __init__(self, prototxt=None, weights=None):
         self.nodeList = []
         self.holdUpdateConnects = True
+        self.netNeedsUpdate = True
         Flowchart.__init__(self, terminals={
             'dataIn': {'io': 'in'},
             'dataOut': {'io': 'out'}
@@ -134,6 +136,16 @@ class NetFlowchart(Flowchart):
         else:
             # default node config
             node = self.createNode("LayerNode")
+
+    def createNode(self, nodeType, name=None, pos=None):
+        if name in self._nodes:
+            name2 = name
+            n = 1
+            while name2 in self._nodes:
+                name2 = "%s.%d" % (name, n)
+                n += 1
+            name = name2
+        return Flowchart.createNode(self, nodeType, name=name, pos=pos)
 
     def configNodes(self):
         for i, spec in enumerate(self.layerList):
@@ -220,7 +232,7 @@ class NetFlowchart(Flowchart):
 
         # layerProto = LayerProto()
         try :
-            sortedNodes = toposort(deps)
+            sortedNodes = toposort.toposort_flatten(deps)
         except:
             print 'no valid net'
             return
@@ -266,15 +278,20 @@ class NetFlowchart(Flowchart):
         # set needs update whenever net changes params
         # but don't let user change things like net dimensions
         if self.netNeedsUpdate:
-            netArgs = (self.proto, )
+            # tempFile = NamedTemporaryFile()
+
+            # for now make a nonTemp file so I can read it!
+            tempFile = file('aprototxt.prototxt', 'w')
+
+            # print str(self.proto)
+            tempFile.write(str(self.proto))
+            netArgs = (tempFile.name, )
             # store the weights somewhere!
             if self.weights:
-                netArgs += (self.weights)
+                netArgs += (self.weights, )
             # depends on tab? or is process only for test tab anyway?
-            netArgs += caffe.TEST
+            netArgs += (caffe.TEST, )
             self.net = caffe.Net(*netArgs)
-
-        blobs = []
 
         # make a dictionary of terminals and their names
         # we want the terminals that provide the input for our displayNodes
@@ -288,7 +305,7 @@ class NetFlowchart(Flowchart):
 
         kwargs = dict(blobs=blobsDict.keys())
         if self.nextData:
-            kwargs['data']=self.nextData
+            kwargs['data'] = self.nextData
         netOutputs = self.net.forward(**kwargs)
 
         # then we take the blobs from netOutputs and set the corresponding terminal to their value
@@ -360,10 +377,14 @@ class LFlowchartWidget(FlowchartWidget):
 ## Start Qt event loop unless running in interactive mode or using pyside.
 if __name__ == '__main__':
     import sys
+    import os
+
+
+    caffeDir = os.path.expanduser('~') + 'caffe/'
 
     app = QtGui.QApplication([])
 
-    model_dir = '/Users/err258/caffe/models/'
+    model_dir = caffeDir + 'models/'
     rel_path = 'bvlc_reference_caffenet/train_val.prototxt'
     # rel_path = 'bvlc_reference_caffenet/deploy.prototxt'
     model_file = model_dir + rel_path
