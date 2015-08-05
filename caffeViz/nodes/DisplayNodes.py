@@ -6,7 +6,7 @@ from pyqtgraph.flowchart import Node
 import pyqtgraph.flowchart.library as fclib
 import numpy as np
 
-from caffeViz.utils import ROI
+from caffeViz.utils import ROI, split_every
 
 
 class ImagePlotNode(Node):
@@ -18,7 +18,7 @@ class ImagePlotNode(Node):
     nodeName = 'ImagePlot'
     sigViewChanged = QtCore.Signal(object)
 
-    def __init__(self, name):
+    def __init__(self, name, **kwargs):
         self.plot = None
         self.plots = {}  # list of available plots user may select from
         self.ui = None
@@ -27,9 +27,12 @@ class ImagePlotNode(Node):
         self.scatterDefaults = dict(symbol='+', symbolPen='r', symbolSize=8, symbolBrush='r', pen=None)
         self.curveDefaults = dict(pen='w')
 
+        opts = dict(allowAddInput=True,
+                       terminals=dict(image={'io': 'in'}, points={'io': 'in'}, curves={'io': 'in'}, rois={'io': 'in'}))
+        opts.update(**kwargs)
+
         ## Initialize node with only a single input terminal
-        Node.__init__(self, name, allowAddInput=True, terminals=
-            dict(image={'io': 'in'}, points={'io': 'in'}, curves={'io': 'in'}, rois={'io': 'in'}))
+        Node.__init__(self, name, **opts)
 
     def setPlot(self, plot):  ## setView must be called by the program
         if plot == self.plot:
@@ -69,10 +72,18 @@ class ImagePlotNode(Node):
                 self.plotItem.addItem(plotROI)
 
     def plotImage(self, image):
-        # sort out of image is a blob from caffe
+        # sort out of image is a blob from caffenetOutputs[blobName]
         # if the image is 3D and the trailing dimension is not 3 or 4 (RGB(A)), it's a blob
-        if image.ndim == 3 and any([image.shape(2) != i for i in [3,4]]):
-            image = self.constructImageFromBlob(blob=image)
+        if image.ndim == 4:
+            # TODO handle batched input
+            # for now, just take a 3D blob: ch x h x w
+            image = np.squeeze(image)
+            if image.ndim == 3:
+                if any([image.shape[0] == i for i in [3, 4]]):
+                    image = image[::-1]
+                    image = image.swapaxes(0, 2)
+                else:
+                    image = self.constructImageFromBlob(blob=image)
         imageItem = pg.ImageItem(image)
         self.plotItem.addItem(imageItem)
 
@@ -90,20 +101,33 @@ class ImagePlotNode(Node):
     def constructImageFromBlob(self, blob):
         imShape = np.array(blob.shape[1:])
         # pad by the smaller of the largest image dimension/10 or 3
-        pad = np.min(np.max(imShape)/10, 3)
+        pad = min(np.max(imShape)/10, 3)
         blob = np.pad(blob, pad_width=((0, 0), (0, pad), (0, pad)), mode='constant')
 
         # make a squarish grid of the layers in the blob
-        numChannels = blob.shape(0)
+        numChannels = blob.shape[0]
         minWidth = np.floor(np.sqrt(numChannels))
 
         aList = []
-        for i in range(minWidth):
-            aList.append(np.hstack(blob[i * minWidth:(i + 1) * minWidth]))
-        shape = aList[0].shape
-        for anArr in aList:
-            anArr.resize(shape, refcheck=False)
-        return np.vstack(aList)[:pad, :pad]
+
+        # cols grow to accomodate demand first, then rows
+        numCols = int(np.ceil(numChannels/minWidth))
+        # numRows = int(np.ceil(numChannels/numCols))
+
+        # take a stack of minWidth channels (like dealing cards one person at a time)
+        splits = split_every(numCols, blob)
+        for split in splits:
+            aList.append(np.hstack(split))
+            # aList.append(np.hstack(blob[i * numCols:(i + 1) * numCols]))
+        aList[-1] = aList[-1].T.copy()
+        aList[-1].resize(aList[0].shape[::-1])
+
+        # last.resize(aList[0].shape[::-1], refCheck=False)
+        # last = last.T
+        # last.resize(aList[0].shape, refcheck=False)
+        # aList[-1] = last
+        aList[-1] = aList[-1].T
+        return np.vstack(aList)[:-pad, :-pad]
         #
         # imShape = np.array(blob.shape[1:])
         # # pad by the smaller of the largest image dimension/10 or 3

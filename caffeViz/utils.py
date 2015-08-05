@@ -1,6 +1,8 @@
 __author__ = 'ellery'
 
 import numpy as np
+from itertools import islice
+
 
 from contextlib import contextmanager
 
@@ -35,6 +37,19 @@ def signalsBlocked(qObject):
     qObject.blockSignals(True)
     yield
     qObject.blockSignals(False)
+
+def split_every(n, iterable):
+    """
+    split an iterable into batches
+    :param n: number per split
+    :param iterable: iterable to split
+    :return: a generator that returns tuples such as (1,2,3), (4,5,6) ...
+    """
+    i = iter(iterable)
+    piece = list(islice(i, n))
+    while piece:
+        yield piece
+        piece = list(islice(i, n))
 
 class ROI(object):
     def __init__(self, r0=None, r1=None, rc=None, roi_radius=None):

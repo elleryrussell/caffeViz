@@ -9,7 +9,8 @@ from pyqtgraph import dockarea
 from pyqtgraph import QtCore, QtGui
 import sys
 from pyqtgraph.flowchart.library import Display
-
+from pyqtgraph.flowchart.library import getNodeTree
+displayNodes = tuple(getNodeTree()['Display'].values())
 
 class MainView(QtGui.QMainWindow):
     def __init__(self, model_file=None, weights_file=None):
@@ -61,7 +62,8 @@ class MainView(QtGui.QMainWindow):
         w.sizePolicy().setHorizontalPolicy(QtGui.QSizePolicy.MinimumExpanding)
 
         self.tabWidget.currentChanged.connect(self.tabChanged)
-        self.tabWidget.setCurrentIndex(0)
+        self.tabWidget.setCurrentIndex(1)
+        self.tabWidget.setCurrentIndex(2)
         self.fc.sigDisplayNodeAdded.connect(self.addPlot)
 
         self.displayControlDock = pg.dockarea.Dock('Control')
@@ -71,6 +73,7 @@ class MainView(QtGui.QMainWindow):
         displayCtrlUi.previousBtn.clicked.connect(self.updateDisplay)
         displayCtrlUi.updateBtn.clicked.connect(self.updateDisplay)
         displayCtrlUi.nextBtn.clicked.connect(self.updateDisplay)
+        self.displayCtrlUi = displayCtrlUi
 
         self.displayControlDock.addWidget(formWidget)
         self.ui.displayArea.addDock(self.displayControlDock, position='top')
@@ -99,7 +102,7 @@ class MainView(QtGui.QMainWindow):
         self.plots[name] = plot
         self.plotNodes[name] = plotNode
         # get class of plot node to determine type of plot
-        if isinstance(plotNode, Display.PlotWidgetNode):
+        if isinstance(plotNode, displayNodes):
             plotNode.setPlot(plot)
 
         plotDock = pg.dockarea.Dock(name)
@@ -108,8 +111,8 @@ class MainView(QtGui.QMainWindow):
         self.ui.displayArea.addDock(plotDock)
         self.tabWidget.update()
 
-        for name, plotNode in self.plotNodes.items():
-            plotNode.setPlotList(self.plots)
+        # for name, plotNode in self.plotNodes.items():
+        #     plotNode.setPlotList(self.plots)
 
     def updateDisplay(self):
         sender = self.sender()
@@ -128,6 +131,9 @@ if __name__ == '__main__':
     # win.show()
 
     import os.path
+    import caffe
+
+    # net = caffe.Net('aprototxt.prototxt', caffe.TEST)
 
     base_path = os.path.expanduser('~')
     model_dir = base_path + '/caffe/models/'
@@ -148,6 +154,21 @@ if __name__ == '__main__':
 
     win = MainView(model_file, weights_file=weights_file)
     win.show()
+
+    imageNode0 = win.fc.createNode('ImagePlot', pos=(4*120, 16*120))
+    cropNode = win.fc.nodes()['crop.2']
+    win.fc.connectTerminals(cropNode['score.o'], imageNode0['image'])
+
+    imageNode1 = win.fc.createNode('ImagePlot', pos=(0*120, 0*120))
+    dataNode = win.fc.nodes()['data']
+    win.fc.connectTerminals(dataNode['data.o'], imageNode1['image'])
+
+    imageNode2 = win.fc.createNode('ImagePlot', pos=(2*120, 0*120))
+    labelNode = win.fc.nodes()['label']
+    win.fc.connectTerminals(labelNode['label.o'], imageNode2['image'])
+
+
+    win.displayCtrlUi.updateBtn.click()
 
 
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
