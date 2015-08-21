@@ -1,8 +1,9 @@
 from caffe.proto.caffe_pb2 import LayerParameter as LayerProto, NetParameter, V1LayerParameter
 from caffeViz import netTerminal
-
+from google.protobuf import descriptor as _descriptor
 from caffeViz.customParameterTypes import LParameter
 from caffeViz.netTerminal import NetTerminal
+from caffeViz.protobufUtils import assign_proto
 
 __author__ = 'ellery'
 
@@ -24,7 +25,7 @@ class LayerNode(Node):
     """PsuedoNode for caffe layer"""
 
     generalParams = LayerProto
-    nodeName = "LayerNode"
+    nodeName = "Layer"
     sigProtoChanged = QtCore.Signal(object)
 
     def __init__(self, name):
@@ -52,7 +53,7 @@ class LayerNode(Node):
         # self.bottoms.sigChildAdded.connect(self.updateTerminals)
         # self.tops.sigChildAdded.connect(self.updateTerminals)
 
-        if self.nodeName != "LayerNode":
+        if self.nodeName != "Layer":
             proto = LayerProto()
             proto.type = self.nodeName
             self.configFromLayerSpec(proto)
@@ -149,7 +150,6 @@ class LayerNode(Node):
 
         self.graphicsItem().updateTerminals()
         self.sigTerminalRenamed.emit(term, oldName)
-
 
     def paramTreeChanged(self, topParam, changes):
         for childParam, change, value in changes:
@@ -248,41 +248,6 @@ LayerTypes = ['AbsVal', 'Accuracy', 'ArgMax', 'BNLL', 'Concat', 'ContrastiveLoss
 #             pass
 #         else
 #
-
-def assign_proto(proto, param):
-    """Assign a Python object to a protobuf message, based on the Python
-    type (in recursive fashion). Lists become repeated fields/messages, dicts
-    become messages, and other types are assigned directly."""
-
-    # repeated fields type
-    if param.type() == 'repeated':
-        if param.valueIsDefault():
-            return
-        # if hasattr(param, 'addList'):
-        children = param.children()
-        # message type
-        for child in children:
-            if child.type() == 'message':
-                proto_item = getattr(proto, param.name()).add()
-                for grandchild in child.children():
-                    assign_proto(proto_item, grandchild)
-            elif not child.valueIsDefault():
-                getattr(proto, param.name()).extend([child.value()])
-                # message type
-    elif param.type() == 'message':
-        for childParam in param.children():
-            assign_proto(getattr(proto, param.name()), childParam)
-    elif param.valueIsDefault():
-        return proto
-    elif param.type() == 'list':
-        setattr(proto, param.name(), param.value())
-    # any other type
-    else:
-        setattr(proto, param.name(), param.value())
-        # default = param.defaultValue(), param.value()
-        # print default
-        # print proto
-        # return proto
 
 
 fclib.registerNodeType(LayerNode, [('Layers',)])

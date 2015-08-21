@@ -1,6 +1,8 @@
+from pyqtgraph.widgets.FileDialog import FileDialog
 from caffeViz.Views import MainViewTemplate as MView
 from caffeViz.Views import DisplayControlWidgetTemplate as DispCtrl
 from caffeViz.flowcharts.flowcharts import NetFlowchart
+from caffeViz.nodes.SolverNode import SolverNode
 
 __author__ = 'err258'
 
@@ -9,10 +11,18 @@ from pyqtgraph import dockarea
 from pyqtgraph import QtCore, QtGui
 import sys
 from pyqtgraph.flowchart.library import Display
+import numpy as np
+import caffe
 
 
 class MainView(QtGui.QMainWindow):
-    def __init__(self, model_file=None, weights_file=None):
+    def __init__(self, modelFile=None, weightsFile=None, solverFile=None, filePath=None):
+        if filePath is not None:
+            modelFile = filePath + modelFile
+            weightsFile = filePath + weightsFile
+            solverFile = filePath + solverFile
+
+        self.filePath = filePath
 
         self.plots = {}
         self.plotNodes = {}
@@ -35,7 +45,7 @@ class MainView(QtGui.QMainWindow):
         layout.addWidget(self.tabWidget)
         self.setCentralWidget(cw)
 
-        self.fc = NetFlowchart(prototxt=model_file, weights=weights_file)
+        self.fc = NetFlowchart(prototxt=modelFile, weights=weightsFile)
         self.fc.sigChartChanged.connect(self.fc.configNode)
         w = self.fc.widget()
 
@@ -74,6 +84,20 @@ class MainView(QtGui.QMainWindow):
 
         self.displayControlDock.addWidget(formWidget)
         self.ui.displayArea.addDock(self.displayControlDock, position='top')
+
+        self.solverNode = SolverNode('solver', solverFile, weightsFile, filePath)
+        self.solverNode.sigOutputDataChanged.connect(self.updateTrainPlots)
+        self.ui.trainButton.pressed.connect(self.solverNode.trainNet)
+        self.ui.stopButton.pressed.connect(self.solverNode.stopTraining)
+        self.ui.resumeButton.pressed.connect(self.solverNode.resumeTraining)
+        self.ui.loadSolverButton.pressed.connect(self.loadSolver)
+        self.ui.saveSolverButton.pressed.connect(self.saveSolver)
+        self.ui.trainParamTree.addParameters(self.solverNode.param)
+        zeros = np.zeros(1)
+        plotItem = self.ui.trainGraphicsLayout.plotItem
+        self.trainLossPlot = plotItem.plot(zeros, pen='b', name='train loss')
+        self.testLossPlot = plotItem.plot(zeros, pen='g', name='test loss')
+        self.testAccPlot = plotItem.plot(zeros, pen='r', name='test accuracy')
 
     def tabChanged(self, tabIndex):
         if tabIndex == 0:
@@ -119,6 +143,49 @@ class MainView(QtGui.QMainWindow):
             self.selectInput(1)
         self.fc.process()
 
+    def loadSolver(self, fileName=None, startDir=None):
+        if fileName is None:
+            if startDir is None:
+                startDir = self.filePath
+            if startDir is None:
+                startDir = '.'
+            self.fileDialog = FileDialog(None, "Load Flowchart..", startDir, "Protobuf (*.prototxt)")
+            # self.fileDialog.setFileMode(QtGui.QFileDialog.AnyFile)
+            # self.fileDialog.setAcceptMode(QtGui.QFileDialog.AcceptSave)
+            self.fileDialog.show()
+            self.fileDialog.fileSelected.connect(self.loadSolver)
+            return
+        fileName = unicode(fileName)
+        self.solverNode.setProto(fileName)
+
+    def saveSolver(self, fileName=None, startDir=None, suggestedFileName='solver.prototxt'):
+        if fileName is None:
+            if startDir is None:
+                startDir = self.filePath
+            if startDir is None:
+                startDir = '.'
+            self.fileDialog = FileDialog(None, "Save Solver..", startDir, "Prototxt (*.prototxt)")
+            self.fileDialog.setAcceptMode(QtGui.QFileDialog.AcceptSave)
+            self.fileDialog.show()
+            self.fileDialog.fileSelected.connect(self.saveSolver)
+            return
+
+        fileName = unicode(fileName)
+        self.solverNode.writeProto(fileName)
+
+    def updateTrainPlots(self, data):
+        trainLoss = data['trainLoss']
+        testLoss = data['testLoss']
+        testAcc = data['testAcc']
+        self.trainLossPlot.setData(trainLoss)
+        self.testLossPlot.setData(testLoss)
+        self.testAccPlot.setData(testAcc)
+
+    def stopTraining(self):
+        pass
+
+    def resumeTraining(self):
+        pass
 
 
 if __name__ == '__main__':
@@ -132,22 +199,19 @@ if __name__ == '__main__':
     base_path = os.path.expanduser('~')
     model_dir = base_path + '/caffe/models/'
 
-    # net_dir = 'bvlc_reference_caffenet/'
-    net_dir = '91eece041c19ff8968ee/'
+    net_dir = 'bvlc_reference_caffenet/'
+    # net_dir = '91eece041c19ff8968ee/'
 
-    dir = model_dir + net_dir
+    filePath = model_dir + net_dir
 
-    model_path = 'train_val.prototxt'
+    modelName = 'train_val.prototxt'
+    # weightsName = 'fcn-8s-pascalcontext.caffemodel'
+    weightsName = 'bvlc_reference_caffenet.caffemodel'
+    solverName = 'solver.prototxt'
 
-    weights_path = 'fcn-8s-pascalcontext.caffemodel'
-    # weights_path = 'bvlc_reference_caffenet.caffemodel'
-
-    model_file = dir + model_path
-
-    weights_file = dir + weights_path
-
-    win = MainView(model_file, weights_file=weights_file)
+    win = MainView(modelFile=modelName, weightsFile=weightsName, solverFile=solverName, filePath=filePath)
     win.show()
+    win.ui.trainButton.click()
 
 
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):

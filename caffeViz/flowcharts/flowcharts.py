@@ -1,6 +1,3 @@
-import inspect
-from tempfile import NamedTemporaryFile
-
 from pyqtgraph.flowchart.Flowchart import Flowchart, FlowchartWidget
 from pyqtgraph.flowchart.Terminal import Terminal
 from caffe.proto.caffe_pb2 import NetParameter as NetProto
@@ -8,8 +5,8 @@ import toposort
 from pyqtgraph.flowchart.library import getNodeTree
 
 from caffeViz.netTerminal import NetConnectionItem
+from caffeViz.protobufUtils import parsePrototxt
 
-import caffeViz.nodes
 displayNodes = tuple(getNodeTree()['Display'].values())
 
 from pyqtgraph.widgets.FileDialog import FileDialog
@@ -19,35 +16,7 @@ from caffeViz.nodes.LayerNodes import LayerNode
 __author__ = 'ellery'
 
 from pyqtgraph.Qt import QtGui, QtCore
-from google.protobuf import text_format
 import caffe
-
-from caffeViz.nodes import LayerNodes
-
-
-def _readProtoNetFile(filepath):
-    solver_config = NetProto()
-
-    return _readProtoFile(filepath, solver_config)
-
-
-def _readProtoFile(filepath, parser_object):
-    file = open(filepath, "r")
-
-    if not file:
-        raise NameError("ERROR (" + filepath + ")!")
-
-    text_format.Merge(str(file.read()), parser_object)
-    file.close()
-    return parser_object
-
-
-def parseNetPrototxt(filename):
-    """return a list of layers and their (perhaps nested) fields to initialize Nodes """
-    netPB = _readProtoNetFile(filename)
-    # all of the layer messages
-
-    return netPB
 
 
 class NetFlowchart(Flowchart):
@@ -70,7 +39,7 @@ class NetFlowchart(Flowchart):
             self.layerList = self.proto.layer
             self.plotList = {}
         else:
-            self.proto = parseNetPrototxt(prototxt)
+            self.proto = parsePrototxt(prototxt, 'net')
             self.layerList = self.proto.layer
             # for old proto
             if len(self.layerList)==0:
@@ -126,7 +95,7 @@ class NetFlowchart(Flowchart):
                 else:
                     xpos += 120
                 lastNum = primaryDigit
-                node = self.createNode("LayerNode", name=name, pos=(xpos, ypos))
+                node = self.createNode("Layer", name=name, pos=(xpos, ypos))
                 # node.configFromLayerSpec(layerParam)
                 # node.configFromLayerSpec(layerParam)
                 # node.sigRenamed.connect(self.nodeRenamed)
@@ -135,7 +104,7 @@ class NetFlowchart(Flowchart):
             self.outputNode.graphicsItem().setPos(xpos, 0)
         else:
             # default node config
-            node = self.createNode("LayerNode")
+            node = self.createNode("Layer")
 
     def createNode(self, nodeType, name=None, pos=None):
         if name in self._nodes:
@@ -263,7 +232,7 @@ class NetFlowchart(Flowchart):
             #fileName = QtGui.QFileDialog.getOpenFileName(None, "Load Flowchart..", startDir, "Flowchart (*.fc)")
         fileName = unicode(fileName)
         self.clear()
-        self.proto = parseNetPrototxt(fileName)
+        self.proto = parsePrototxt(fileName, 'net')
         self.layerList = self.proto.layer
         self.initNodes()
         self.holdUpdateConnects = True
@@ -379,11 +348,9 @@ if __name__ == '__main__':
     import sys
     import os
 
-
-    caffeDir = os.path.expanduser('~') + 'caffe/'
-
     app = QtGui.QApplication([])
 
+    caffeDir = os.path.expanduser('~') + 'caffe/'
     model_dir = caffeDir + 'models/'
     rel_path = 'bvlc_reference_caffenet/train_val.prototxt'
     # rel_path = 'bvlc_reference_caffenet/deploy.prototxt'

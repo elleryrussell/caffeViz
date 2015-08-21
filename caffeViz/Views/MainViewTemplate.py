@@ -2,7 +2,7 @@
 
 # Form implementation generated from reading ui file 'MainView.ui'
 #
-# Created: Fri Jul 31 21:59:27 2015
+# Created: Thu Aug 20 20:18:14 2015
 #      by: PyQt4 UI code generator 4.10.4
 #
 # WARNING! All changes made in this file will be lost!
@@ -95,25 +95,6 @@ class Ui_tabWidget(object):
         self.horizontalLayout_2.setObjectName(_fromUtf8("horizontalLayout_2"))
         self.gridLayout = QtGui.QGridLayout()
         self.gridLayout.setObjectName(_fromUtf8("gridLayout"))
-        self.trainParamTree = ParameterTree(self.trainTab)
-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Expanding)
-        sizePolicy.setHorizontalStretch(1)
-        sizePolicy.setVerticalStretch(1)
-        sizePolicy.setHeightForWidth(self.trainParamTree.sizePolicy().hasHeightForWidth())
-        self.trainParamTree.setSizePolicy(sizePolicy)
-        self.trainParamTree.setRootIsDecorated(True)
-        self.trainParamTree.setHeaderHidden(True)
-        self.trainParamTree.setObjectName(_fromUtf8("trainParamTree"))
-        self.trainParamTree.headerItem().setText(0, _fromUtf8("1"))
-        self.gridLayout.addWidget(self.trainParamTree, 0, 0, 2, 1)
-        self.trainGraphicsLayout = GraphicsLayoutWidget(self.trainTab)
-        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Expanding)
-        sizePolicy.setHorizontalStretch(2)
-        sizePolicy.setVerticalStretch(12)
-        sizePolicy.setHeightForWidth(self.trainGraphicsLayout.sizePolicy().hasHeightForWidth())
-        self.trainGraphicsLayout.setSizePolicy(sizePolicy)
-        self.trainGraphicsLayout.setObjectName(_fromUtf8("trainGraphicsLayout"))
-        self.gridLayout.addWidget(self.trainGraphicsLayout, 0, 1, 1, 1)
         self.controlBox = QtGui.QGroupBox(self.trainTab)
         sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Preferred, QtGui.QSizePolicy.Preferred)
         sizePolicy.setHorizontalStretch(2)
@@ -133,7 +114,32 @@ class Ui_tabWidget(object):
         self.resumeButton = QtGui.QPushButton(self.controlBox)
         self.resumeButton.setObjectName(_fromUtf8("resumeButton"))
         self.horizontalLayout_3.addWidget(self.resumeButton)
+        self.loadSolverButton = QtGui.QPushButton(self.controlBox)
+        self.loadSolverButton.setObjectName(_fromUtf8("loadSolverButton"))
+        self.horizontalLayout_3.addWidget(self.loadSolverButton)
+        self.saveSolverButton = QtGui.QPushButton(self.controlBox)
+        self.saveSolverButton.setObjectName(_fromUtf8("saveSolverButton"))
+        self.horizontalLayout_3.addWidget(self.saveSolverButton)
         self.gridLayout.addWidget(self.controlBox, 1, 1, 1, 1)
+        self.trainParamTree = ParameterTree(self.trainTab)
+        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Expanding)
+        sizePolicy.setHorizontalStretch(1)
+        sizePolicy.setVerticalStretch(1)
+        sizePolicy.setHeightForWidth(self.trainParamTree.sizePolicy().hasHeightForWidth())
+        self.trainParamTree.setSizePolicy(sizePolicy)
+        self.trainParamTree.setRootIsDecorated(True)
+        self.trainParamTree.setHeaderHidden(True)
+        self.trainParamTree.setObjectName(_fromUtf8("trainParamTree"))
+        self.trainParamTree.headerItem().setText(0, _fromUtf8("1"))
+        self.gridLayout.addWidget(self.trainParamTree, 0, 0, 2, 1)
+        self.trainGraphicsLayout = PlotWidget(self.trainTab)
+        sizePolicy = QtGui.QSizePolicy(QtGui.QSizePolicy.Expanding, QtGui.QSizePolicy.Expanding)
+        sizePolicy.setHorizontalStretch(2)
+        sizePolicy.setVerticalStretch(12)
+        sizePolicy.setHeightForWidth(self.trainGraphicsLayout.sizePolicy().hasHeightForWidth())
+        self.trainGraphicsLayout.setSizePolicy(sizePolicy)
+        self.trainGraphicsLayout.setObjectName(_fromUtf8("trainGraphicsLayout"))
+        self.gridLayout.addWidget(self.trainGraphicsLayout, 0, 1, 1, 1)
         self.horizontalLayout_2.addLayout(self.gridLayout)
         tabWidget.addTab(self.trainTab, _fromUtf8(""))
         self.testTab = QtGui.QWidget()
@@ -224,7 +230,7 @@ class Ui_tabWidget(object):
         tabWidget.addTab(self.testTab, _fromUtf8(""))
 
         self.retranslateUi(tabWidget)
-        tabWidget.setCurrentIndex(2)
+        tabWidget.setCurrentIndex(1)
         QtCore.QMetaObject.connectSlotsByName(tabWidget)
 
     def retranslateUi(self, tabWidget):
@@ -236,12 +242,14 @@ class Ui_tabWidget(object):
         self.trainButton.setText(_translate("tabWidget", "Train", None))
         self.stopButton.setText(_translate("tabWidget", "Stop", None))
         self.resumeButton.setText(_translate("tabWidget", "Resume", None))
+        self.loadSolverButton.setText(_translate("tabWidget", "Load Solver", None))
+        self.saveSolverButton.setText(_translate("tabWidget", "Save Solver", None))
         tabWidget.setTabText(tabWidget.indexOf(self.trainTab), _translate("tabWidget", "Train", None))
         self.parametersLabel_2.setText(_translate("tabWidget", "Parameters", None))
         self.netFlowchartLabel_2.setText(_translate("tabWidget", "Net Flowchart", None))
         self.displayLabel.setText(_translate("tabWidget", "Display", None))
         tabWidget.setTabText(tabWidget.indexOf(self.testTab), _translate("tabWidget", "Test", None))
 
+from pyqtgraph import PlotWidget
 from pyqtgraph.parametertree.ParameterTree import ParameterTree
-from pyqtgraph import GraphicsLayoutWidget
 from pyqtgraph.dockarea import DockArea

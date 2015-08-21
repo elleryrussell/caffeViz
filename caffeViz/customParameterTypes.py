@@ -1,6 +1,7 @@
 from collections import OrderedDict
-from google.protobuf.descriptor_pb2 import FieldDescriptorProto
+from google.protobuf.descriptor_pb2 import FieldDescriptorProto, DescriptorProto
 from google.protobuf.message import Message
+from google.protobuf import descriptor as _descriptor
 
 from pyqtgraph import QtCore
 
@@ -28,26 +29,35 @@ class LParameter(Parameter):
         if fd is None:
             cls = Parameter
         else:
-            typ = typeDict[fd.cpp_type]
-            label = fd.label
-            if label == 3 and opts.get('repeated', True) is True:
-                cls = LPARAM_TYPES['repeated']
-            else:
+            if isinstance(fd, _descriptor.FieldDescriptor):
+                typ = typeDict[fd.cpp_type]
+                label = fd.label
+                if label == 3 and opts.get('repeated', True) is True:
+                    cls = LPARAM_TYPES['repeated']
+                else:
+                    cls = LPARAM_TYPES[typ]
+            elif isinstance(fd, _descriptor.Descriptor):
+                # this is a message type
+                typ = 'message'
+                fd.default_value = None
+                fd.message_type = fd
                 cls = LPARAM_TYPES[typ]
+            else:
+                raise ValueError('Unknown descriptor type')
+            opts['type']=typ
         return cls(**opts)
 
     def __init__(self, fieldDescriptor=None, **opts):
         assert fieldDescriptor is not None
         self.fieldDescriptor = fieldDescriptor
 
-        type = typeDict[fieldDescriptor.cpp_type]
         if 'name' not in opts.keys():
             opts['name'] = fieldDescriptor.name
         default = fieldDescriptor.default_value
         if 'expanded' not in opts.keys():
             opts['expanded'] = False
 
-        Parameter.__init__(self, default=default, type=type, **opts)
+        Parameter.__init__(self, default=default, **opts)
 
     # def protoValue(self):
     #     if not self.valueIsDefault():
@@ -177,8 +187,6 @@ class enumParameter(ListParameter, LParameter):
         for value in fd.enum_type.values:
             limits[value.name] = value.number
         opts['limits'] = limits
-
-
 
         ListParameter.__init__(self, **opts)
 

@@ -1,8 +1,9 @@
 __author__ = 'ellery'
 
+from contextlib import contextmanager
+
 import numpy as np
 
-from contextlib import contextmanager
 
 @contextmanager
 def slotDisconnected(signal, slot):
