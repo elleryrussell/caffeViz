@@ -214,6 +214,7 @@ class LayerNode(Node):
         additionalFieldDescriptor = self.proto.DESCRIPTOR.fields_by_name[name]
         child = LParameter.create(fieldDescriptor=additionalFieldDescriptor)
         self.baseParam = self.param.insertChild(5, child)
+        self.baseParam.setToDefault()
 
     def phase(self):
         includeChildren = self.param.child('include').children()

@@ -4,16 +4,28 @@ layer {
   type: "Data"
   top: "data"
   include {
-    phase: TRAIN
+    phase: TEST
   }
   transform_param {
-    scale: 0.0
     mean_value: 104.00699
     mean_value: 116.66877
     mean_value: 122.67892
   }
   data_param {
-    source: "../../data/pascal-context/pascal-context-train-lmdb"
+    source: "/home/ellery/caffeProjects/pascalContext/data/image-val"
+    batch_size: 1
+    backend: LMDB
+  }
+}
+layer {
+  name: "label"
+  type: "Data"
+  top: "label"
+  include {
+    phase: TEST
+  }
+  data_param {
+    source: "/home/ellery/caffeProjects/pascalContext/data/gt-val"
     batch_size: 1
     backend: LMDB
   }
@@ -25,11 +37,8 @@ layer {
   include {
     phase: TRAIN
   }
-  transform_param {
-    scale: 0.0
-  }
   data_param {
-    source: "../../data/pascal-context/pascal-context-train-gt59-lmdb"
+    source: "/home/ellery/caffeProjects/pascalContext/data/gt-train"
     batch_size: 1
     backend: LMDB
   }
@@ -39,32 +48,15 @@ layer {
   type: "Data"
   top: "data"
   include {
-    phase: TEST
+    phase: TRAIN
   }
   transform_param {
-    scale: 0.0
     mean_value: 104.00699
     mean_value: 116.66877
     mean_value: 122.67892
   }
   data_param {
-    source: "../../data/pascal-context/pascal-context-val-lmdb"
-    batch_size: 1
-    backend: LMDB
-  }
-}
-layer {
-  name: "label"
-  type: "Data"
-  top: "label"
-  include {
-    phase: TEST
-  }
-  transform_param {
-    scale: 0.0
-  }
-  data_param {
-    source: "../../data/pascal-context/pascal-context-val-gt59-lmdb"
+    source: "/home/ellery/caffeProjects/pascalContext/data/image-train"
     batch_size: 1
     backend: LMDB
   }
@@ -268,6 +260,23 @@ layer {
   }
 }
 layer {
+  name: "score-pool3"
+  type: "Convolution"
+  bottom: "pool3"
+  top: "score-pool3"
+  param {
+  }
+  param {
+    lr_mult: 2.0
+    decay_mult: 0.0
+  }
+  convolution_param {
+    num_output: 60
+    kernel_size: 1
+    engine: CAFFE
+  }
+}
+layer {
   name: "conv4_1"
   type: "Convolution"
   bottom: "pool3"
@@ -282,23 +291,6 @@ layer {
     num_output: 512
     pad: 1
     kernel_size: 3
-    engine: CAFFE
-  }
-}
-layer {
-  name: "score-pool3"
-  type: "Convolution"
-  bottom: "pool3"
-  top: "score-pool3"
-  param {
-  }
-  param {
-    lr_mult: 2.0
-    decay_mult: 0.0
-  }
-  convolution_param {
-    num_output: 60
-    kernel_size: 1
     engine: CAFFE
   }
 }
@@ -367,6 +359,23 @@ layer {
   }
 }
 layer {
+  name: "score-pool4"
+  type: "Convolution"
+  bottom: "pool4"
+  top: "score-pool4"
+  param {
+  }
+  param {
+    lr_mult: 2.0
+    decay_mult: 0.0
+  }
+  convolution_param {
+    num_output: 60
+    kernel_size: 1
+    engine: CAFFE
+  }
+}
+layer {
   name: "conv5_1"
   type: "Convolution"
   bottom: "pool4"
@@ -381,23 +390,6 @@ layer {
     num_output: 512
     pad: 1
     kernel_size: 3
-    engine: CAFFE
-  }
-}
-layer {
-  name: "score-pool4"
-  type: "Convolution"
-  bottom: "pool4"
-  top: "score-pool4"
-  param {
-  }
-  param {
-    lr_mult: 2.0
-    decay_mult: 0.0
-  }
-  convolution_param {
-    num_output: 60
-    kernel_size: 1
     engine: CAFFE
   }
 }
@@ -628,4 +620,11 @@ layer {
   loss_param {
     normalize: false
   }
+}
+layer {
+  name: "accuracy"
+  type: "Accuracy"
+  bottom: "score"
+  bottom: "label"
+  top: "accuracy"
 }

@@ -24,8 +24,11 @@ class NetFlowchart(Flowchart):
 
     def __init__(self, prototxt=None, weights=None):
         self.nodeList = []
+        self.displayNodes = {}
         self.holdUpdateConnects = True
         self.netNeedsUpdate = True
+        self.netNeedsEval = True
+        self.nextData = None
         Flowchart.__init__(self, terminals={
             'dataIn': {'io': 'in'},
             'dataOut': {'io': 'out'}
@@ -188,7 +191,10 @@ class NetFlowchart(Flowchart):
             if isinstance(node, LayerNode):
                 node.connectParamTree()
             elif isinstance(node, displayNodes):
+                self.displayNodes[node.name()]=node
                 self.sigDisplayNodeAdded.emit(node)
+        if isinstance(node, LayerNode):
+            self.netNeedsUpdate = True
 
     def updateProto(self):
         deps = {}
@@ -247,6 +253,7 @@ class NetFlowchart(Flowchart):
         # set needs update whenever net changes params
         # but don't let user change things like net dimensions
         if self.netNeedsUpdate:
+            self.updateProto()
             # tempFile = NamedTemporaryFile()
 
             # for now make a nonTemp file so I can read it!
@@ -254,6 +261,7 @@ class NetFlowchart(Flowchart):
 
             # print str(self.proto)
             tempFile.write(str(self.proto))
+            tempFile.close()
             netArgs = (tempFile.name, )
             # store the weights somewhere!
             if self.weights:
@@ -261,25 +269,32 @@ class NetFlowchart(Flowchart):
             # depends on tab? or is process only for test tab anyway?
             netArgs += (caffe.TEST, )
             self.net = caffe.Net(*netArgs)
+            self.netNeedsUpdate = False
+            self.netNeedsEval = True
 
+        if self.netNeedsEval:
+            kwargs = dict()
+            if self.nextData is not None:
+                kwargs['data'] = self.nextData
+            self.net.forward(**kwargs)
+
+        self.updatePlots()
+
+    def updatePlots(self):
         # make a dictionary of terminals and their names
-        # we want the terminals that provide the input for our displayNodes
-
         blobsDict = {}
-        for node in self.displayNodes:
-            for inputTerm in node.inputs():
+        # we want the terminals that provide the input for our displayNodes
+        for nodeName, node in self.displayNodes.items():
+            for inputName, inputTerm in node.inputs().items():
                 for outputTerm in inputTerm.inputTerminals():
-                    blobName = outputTerm.name
-                    blobsDict[blobName] = outputTerm
+                    self.setNetTerminalData(outputTerm)
 
-        kwargs = dict(blobs=blobsDict.keys())
-        if self.nextData:
-            kwargs['data'] = self.nextData
-        netOutputs = self.net.forward(**kwargs)
-
-        # then we take the blobs from netOutputs and set the corresponding terminal to their value
-        for blobName, outputTerm in blobsDict.items():
-            outputTerm.setValue(netOutputs[blobName])
+    def setNetTerminalData(self, term):
+        blobName = term.name()
+        netOutput = self.net.blobs[blobName].data
+        term.setValue(netOutput)
+        node = term.node()
+        node.sigOutputChanged.emit(node)
 
 
     # get node
