@@ -1,6 +1,6 @@
 from caffe.proto.caffe_pb2 import LayerParameter as LayerProto, NetParameter, V1LayerParameter
-from caffeViz import netTerminal
-from google.protobuf import descriptor as _descriptor
+from pyqtgraph.flowchart.Node import NodeGraphicsItem
+
 from caffeViz.customParameterTypes import LParameter
 from caffeViz.netTerminal import NetTerminal
 from caffeViz.protobufUtils import assign_proto
@@ -57,8 +57,18 @@ class LayerNode(Node):
             proto = LayerProto()
             proto.type = self.nodeName
             self.configFromLayerSpec(proto)
-            self.param.child('bottom').addNew()
-            self.param.child('top').addNew()
+            # self.bottoms.addNew()
+            # self.tops.addNew()
+            # self.rename(str(self.nodeName).lower())
+            nodeName = str(self.nodeName).lower()
+            with signalsBlocked(self.param):
+                self.bottoms.addNew("bottom1")
+                self.tops.addNew(nodeName.lower())
+            self.updateTerminals()
+            # usual defaults for caffe
+            # self.rename(nodeName)
+            # self.graphicsItem().nameItem.setPlainText(pg.QtCore.QString(nodeName))
+            # self.updateProto()
 
     def ctrlWidget(self):
         return self.ui
@@ -75,28 +85,30 @@ class LayerNode(Node):
     #     return [makeParamList(fd) for fd in fieldDescriptors]
 
     def configFromLayerSpec(self, layerSpec):
-        print layerSpec
-        # get type for specific param
-        self.proto = layerSpec
-        assert isinstance(layerSpec, (LayerProto, V1LayerParameter))
-        layerType = layerSpec.type
+        with self.param.treeChangeBlocker():
+            print layerSpec
+            # get type for specific param
+            self.proto = layerSpec
+            assert isinstance(layerSpec, (LayerProto, V1LayerParameter))
+            layerType = layerSpec.type
 
-        if isinstance(layerSpec, V1LayerParameter):
-            enumVals = layerSpec.DESCRIPTOR.enum_types_by_name['LayerType'].values_by_number
-            typeName = enumVals[layerType].name
-            self.updateSpecificParam(typeName.capitalize())
-        else:
-            self.updateSpecificParam(layerType)
+            if isinstance(layerSpec, V1LayerParameter):
+                enumVals = layerSpec.DESCRIPTOR.enum_types_by_name['LayerType'].values_by_number
+                typeName = enumVals[layerType].name
+                self.updateSpecificParam(typeName.capitalize())
+            else:
+                self.updateSpecificParam(layerType)
 
-        self.updateParamList(self.proto)
-        self.updateTerminals()
+            self.updateParamList(self.proto)
+            self.updateTerminals()
+
         self.connectParamTree()
-
         self.updateProto()
 
     def connectParamTree(self):
         self.param.sigTreeStateChanged.connect(self.paramTreeChanged)
         self.param.sigTreeStateChanged.connect(self.updateProto)
+
 
     def updateParamList(self, layerSpec):
         self.param.setValue(layerSpec)
@@ -176,13 +188,20 @@ class LayerNode(Node):
         with signalsBlocked(self.param):
             nameParam = self.param.child('name')
             nameParam.setValue(self.name())
+        self.updateProto()
 
     def updateBlobs(self):
+        """
+        called when terminals are added, removed, or renamed to update the parameter tree
+        :return:
+        """
         with signalsBlocked(self.param):
+            # with signalsBlocked(self.param):
             inputs = self.inputs()
-            self.bottoms.setValue([i for i in inputs], clear=True)
+            self.bottoms.setValue([i.name() for i in inputs.values()], clear=True)
             outputs = self.outputs()
-            self.tops.setValue([o for o in outputs], clear=True)
+            self.tops.setValue([o.name() for o in outputs.values()], clear=True)
+        self.updateProto()
 
     def updateSpecificParam(self, layerType):
         layerSpec = self.proto
@@ -223,6 +242,31 @@ class LayerNode(Node):
             includeChild = includeChildren[0]
             return includeChild.child('phase').value()
         return self.param.child('phase').value()
+
+    def graphicsItem(self):
+        """Return the GraphicsItem for this node. Subclasses may re-implement
+        this method to customize their appearance in the flowchart."""
+        if self._graphicsItem is None:
+            self._graphicsItem = LayerNodeGraphicsItem(self)
+        return self._graphicsItem
+
+    def removeTerminal(self, term):
+        """Remove the specified terminal from this Node. May specify either the
+        terminal's name or the terminal itself.
+
+        Causes sigTerminalRemoved to be emitted."""
+        if isinstance(term, NetTerminal):
+            name = term._name
+        Node.removeTerminal(self, name)
+
+
+class LayerNodeGraphicsItem(NodeGraphicsItem):
+    def __init__(self, node):
+        NodeGraphicsItem.__init__(self, node)
+        self.bounds = QtCore.QRectF(0, 0, 200, 200)
+
+        self.nameItem.moveBy(self.bounds.width() / 2. - self.nameItem.boundingRect().width() / 2., 0)
+
 
 
 "Allowed Types"
