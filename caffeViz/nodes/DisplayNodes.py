@@ -1,12 +1,12 @@
 __author__ = 'ellery'
 
 import pyqtgraph as pg
-from pyqtgraph import QtCore, QtGui, ComboBox
+from pyqtgraph import QtCore, ComboBox
 from pyqtgraph.flowchart import Node
 import pyqtgraph.flowchart.library as fclib
 import numpy as np
 
-from caffeViz.utils import ROI, split_every
+from caffeViz.utils import split_every
 
 
 class ImagePlotNode(Node):
@@ -80,11 +80,14 @@ class ImagePlotNode(Node):
             image = np.squeeze(image)
             if image.ndim == 3:
                 if any([image.shape[0] == i for i in [3, 4]]):
+                    # BGR - RGB
                     image = image[::-1]
-                    image = image.swapaxes(0, 2)
+                    # to h x w x ch
+                    image = np.rollaxis(image, 0, 3)
                 else:
                     image = self.constructImageFromBlob(blob=image)
-        imageItem = pg.ImageItem(image)
+        # pyqtgraph expects w x h..
+        imageItem = pg.ImageItem(image.swapaxes(0, 1))
         self.plotItem.addItem(imageItem)
 
     def plotPoints(self, points, **plotArgs):
