@@ -1,4 +1,5 @@
 from pyqtgraph.widgets.FileDialog import FileDialog
+
 from caffeViz.Views import MainViewTemplate as MView
 from caffeViz.Views import DisplayControlWidgetTemplate as DispCtrl
 from caffeViz.flowcharts.flowcharts import NetFlowchart
@@ -10,9 +11,7 @@ import pyqtgraph as pg
 from pyqtgraph import dockarea
 from pyqtgraph import QtCore, QtGui
 import sys
-from pyqtgraph.flowchart.library import Display
 import numpy as np
-import caffe
 
 from pyqtgraph.flowchart.library import getNodeTree
 displayNodes = tuple(getNodeTree()['Display'].values())
@@ -144,8 +143,9 @@ class MainView(QtGui.QMainWindow):
         if sender.objectName() == u'previousBtn':
             self.selectInput(-1)
         elif sender.objectName() == u'nextBtn':
-            self.selectInput(1)
-        self.fc.process()
+            self.fc.process(forward=True)
+        else:
+            self.fc.process(forward=False)
 
     def loadSolver(self, fileName=None, startDir=None):
         if fileName is None:
@@ -199,41 +199,43 @@ if __name__ == '__main__':
     # win.show()
 
     import os.path
-    import caffe
 
     # net = caffe.Net('aprototxt.prototxt', caffe.TEST)
 
     base_path = os.path.expanduser('~')
-    model_dir = base_path + '/caffe/models/'
+    # model_dir = base_path + '/caffe/models/'
+    model_dir = base_path + '/caffeProjects/pascalContext/'
 
-    net_dir = 'bvlc_reference_caffenet/'
-    # net_dir = '91eece041c19ff8968ee/'
+    # net_dir = 'bvlc_reference_caffenet/'
+    # net_dir = 'pascalContextFCN8/'
+    net_dir = 'googleNet/'
 
     filePath = model_dir + net_dir
 
     modelName = 'train_val.prototxt'
+    weightsName = 'bvlc_googlenet_iter_1400.caffemodel'
     # weightsName = 'fcn-8s-pascalcontext.caffemodel'
-    weightsName = 'bvlc_reference_caffenet.caffemodel'
+    # weightsName = 'bvlc_reference_caffenet.caffemodel'
     solverName = 'solver.prototxt'
 
     win = MainView(modelFile=modelName, weightsFile=weightsName, solverFile=solverName, filePath=filePath)
     win.show()
-    win.ui.trainButton.click()
+    # win.ui.trainButton.click()
 
-    imageNode0 = win.fc.createNode('ImagePlot', pos=(4*120, 16*120))
-    cropNode = win.fc.nodes()['crop.2']
-    win.fc.connectTerminals(cropNode['score.o'], imageNode0['image'])
+    # imageNode0 = win.fc.createNode('ImagePlot', pos=(4*120, 16*120))
+    # cropNode = win.fc.nodes()['crop.2']
+    # win.fc.connectTerminals(cropNode['score.o'], imageNode0['image'])
+    #
+    # imageNode1 = win.fc.createNode('ImagePlot', pos=(0*120, 0*120))
+    # dataNode = win.fc.nodes()['data']
+    # win.fc.connectTerminals(dataNode['data.o'], imageNode1['image'])
+    #
+    # imageNode2 = win.fc.createNode('ImagePlot', pos=(2*120, 0*120))
+    # labelNode = win.fc.nodes()['label']
+    # win.fc.connectTerminals(labelNode['label.o'], imageNode2['image'])
 
-    imageNode1 = win.fc.createNode('ImagePlot', pos=(0*120, 0*120))
-    dataNode = win.fc.nodes()['data']
-    win.fc.connectTerminals(dataNode['data.o'], imageNode1['image'])
 
-    imageNode2 = win.fc.createNode('ImagePlot', pos=(2*120, 0*120))
-    labelNode = win.fc.nodes()['label']
-    win.fc.connectTerminals(labelNode['label.o'], imageNode2['image'])
-
-
-    win.displayCtrlUi.updateBtn.click()
+    # win.displayCtrlUi.updateBtn.click()
 
 
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
