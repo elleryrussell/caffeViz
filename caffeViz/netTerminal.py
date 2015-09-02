@@ -21,6 +21,19 @@ class NetTerminal(Terminal):
 
     def rename(self, name):
         oldName = self._name
-        self._name = name + oldName[-len('.o'):]
+        if self.isInput():
+            ext = '.i'
+        else:
+            ext = '.o'
+        self._name = name + ext
         self.node().terminalRenamed(self, oldName)
         self.graphicsItem().termRenamed(name)
+
+    def connectTo(self, term, connectionItem=None, rename=True):
+        Terminal.connectTo(self, term, connectionItem=connectionItem)
+        if rename and isinstance(term, NetTerminal):
+            # caffe expects input and output terminals to match names
+            if self.isInput():
+                self.rename(term.name())
+            else:
+                term.rename(self.name())

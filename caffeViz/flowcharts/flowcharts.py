@@ -1,10 +1,12 @@
+from pyqtgraph import configfile
 from pyqtgraph.flowchart.Flowchart import Flowchart, FlowchartWidget
 from pyqtgraph.flowchart.Terminal import Terminal
 from caffe.proto.caffe_pb2 import NetParameter as NetProto
 import toposort
 from pyqtgraph.flowchart.library import getNodeTree
+from numpy import ndarray
 
-from caffeViz.netTerminal import NetConnectionItem
+from caffeViz.netTerminal import NetConnectionItem, NetTerminal
 from caffeViz.protobufUtils import parsePrototxt
 
 displayNodes = tuple(getNodeTree()['Display'].values())
@@ -34,6 +36,10 @@ class NetFlowchart(Flowchart):
             'dataOut': {'io': 'out'}
         })
 
+        # ctrlWidget = self.widget()
+        # del ctrlWidget.chartWidget
+        # ctrlWidget.chartWidget = LFlowchartWidget(self, ctrlWidget)
+        # ctrlWidget.cwWin.setCentralWidget(ctrlWidget.chartWidget)
         # self.widget().__class__ = LFlowchartCtrlWidget
         # self.widget().__init__(self)
 
@@ -66,21 +72,25 @@ class NetFlowchart(Flowchart):
         fcw.moveDock(fcw.hoverDock, 'bottom', fcw.viewDock)
         fcw.moveDock(fcw.selDock, 'right', fcw.hoverDock)
 
-        # ctrlWidget = self.widget()
-        # ctrlWidget.chartWidget = LFlowchartWidget(ctrlWidget.chart, ctrlWidget)
         # self.setNodes()
         # self.connectNodes()
 
     def addNode(self, node, name, pos=None):
         Flowchart.addNode(self, node, name, pos=pos)
-        node.sigTerminalAdded.connect(self.connectNodes)
-        node.sigTerminalRemoved.connect(self.connectNodes)
-        node.sigTerminalRenamed.connect(self.connectNodes)
+        # node.sigTerminalAdded.connect(self.connectNodes)
+        # node.sigTerminalRemoved.connect(self.connectNodes)
+        # node.sigTerminalRenamed.connect(self.connectNodes)
+
+    def clear(self):
+        self.nodeList = []
+        Flowchart.clear(self)
 
     def initNodes(self):
+        nodeSize = 200
+        spacingSize = int(nodeSize * 1.1)
         ## eventually this should be a list of tops from parsePrototxt
         if self.layerList:
-            ypos, xpos = 0, -120
+            ypos, xpos = 0, -spacingSize
             lastNum = 1
             for i, layerParam in enumerate(self.layerList):
                 name = layerParam.name
@@ -92,11 +102,11 @@ class NetFlowchart(Flowchart):
                     primaryDigit = digits[0]
                 # numeric suffix of layer
                 if lastNum != primaryDigit:
-                    ypos += 120
+                    ypos += spacingSize
                     xpos = 0
                     # xpos += node.graphicsItem().bounds.width() + 20
                 else:
-                    xpos += 120
+                    xpos += spacingSize
                 lastNum = primaryDigit
                 node = self.createNode("Layer", name=name, pos=(xpos, ypos))
                 # node.configFromLayerSpec(layerParam)
@@ -148,7 +158,11 @@ class NetFlowchart(Flowchart):
 
                                 conItem = NetConnectionItem(iTerm.graphicsItem(), output.graphicsItem())
                                 conItem.setStyle(color=color, shape='cubic')
-                                iTerm.connectTo(output, conItem)
+                                try:
+                                    assert isinstance(iTerm, NetTerminal)
+                                    iTerm.connectTo(output, conItem, rename=False)
+                                except TypeError:
+                                    iTerm.connectTo(output, conItem)
                                 # self.connectTerminals(iTerm, output)
                                 # break
                                 # if doBreak:
@@ -249,7 +263,25 @@ class NetFlowchart(Flowchart):
         #self.emit(QtCore.SIGNAL('fileLoaded'), fileName)
         self.sigFileLoaded.emit(fileName)
 
-    def process(self, **args):
+    def saveFile(self, fileName=None, startDir=None, suggestedFileName='flowchart.fc'):
+        if fileName is None:
+            if startDir is None:
+                startDir = self.filePath
+            if startDir is None:
+                startDir = '.'
+            self.fileDialog = FileDialog(None, "Save Flowchart..", startDir, "Flowchart (*.fc)")
+            # self.fileDialog.setFileMode(QtGui.QFileDialog.AnyFile)
+            self.fileDialog.setAcceptMode(QtGui.QFileDialog.AcceptSave)
+            # self.fileDialog.setDirectory(startDir)
+            self.fileDialog.show()
+            self.fileDialog.fileSelected.connect(self.saveFile)
+            return
+            # fileName = QtGui.QFileDialog.getSaveFileName(None, "Save Flowchart..", startDir, "Flowchart (*.fc)")
+        fileName = unicode(fileName)
+        configfile.writeConfigFile(self.saveState(), fileName)
+        self.sigFileSaved.emit(fileName)
+
+    def process(self, forward=False, **args):
         # set needs update whenever net changes params
         # but don't let user change things like net dimensions
         if self.netNeedsUpdate:
@@ -272,11 +304,12 @@ class NetFlowchart(Flowchart):
             self.netNeedsUpdate = False
             self.netNeedsEval = True
 
-        if self.netNeedsEval:
+        if self.netNeedsEval or forward == True:
             kwargs = dict()
             if self.nextData is not None:
                 kwargs['data'] = self.nextData
             self.net.forward(**kwargs)
+            self.netNeedsEval = False
 
         self.updatePlots()
 
@@ -297,21 +330,44 @@ class NetFlowchart(Flowchart):
         node.sigOutputChanged.emit(node)
 
 
-    # get node
-
-    # def widget(self):
-    #     if self._widget is None:
-    #         self._widget = LFlowchartCtrlWidget(self)
-    #         self.scene = self._widget.scene()
-    #         self.viewBox = self._widget.viewBox()
-    #     return self._widget
-
+        # get node
 
 colorDict = {-1:'w', 0:'r', 1:'b', None:None}
 
 class LFlowchartWidget(FlowchartWidget):
     def __init__(self, *args, **kwargs):
         FlowchartWidget.__init__(self, *args, **kwargs)
+
+    def hoverOver(self, items):
+        # print "FlowchartWidget.hoverOver called."
+        term = None
+        layerNode = None
+        for item in items:
+            if item is self.hoverItem:
+                return
+            self.hoverItem = item
+            if hasattr(item, 'term') and isinstance(item.term, Terminal):
+                term = item.term
+                break
+            elif isinstance(item, LayerNode):
+                layerNode = item
+        if term is None and layerNode is None:
+            txt = ""
+        elif layerNode is None:
+            val = term.value()
+            if isinstance(val, ndarray):
+                val = "%s %s %s" % (type(val).__name__, str(val.shape), str(val.dtype))
+            else:
+                val = str(val)
+                if len(val) > 400:
+                    val = val[:400] + "..."
+            txt = "%s.%s = %s" % (term.node().name(), term.name(), val)
+        else:
+            val = layerNode.proto
+            if len(val) > 400:
+                val = val[:400] + "..."
+            txt = "%s.proto = %s" % (layerNode.name(), val)
+        self.hoverText.setPlainText(txt)
 #
 # class LFlowchartCtrlWidget(FlowchartCtrlWidget):
 #     def __init__(self, chart):
