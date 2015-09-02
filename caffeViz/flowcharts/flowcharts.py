@@ -93,7 +93,7 @@ class NetFlowchart(Flowchart):
             ypos, xpos = 0, -spacingSize
             lastNum = 1
             for i, layerParam in enumerate(self.layerList):
-                name = layerParam.name
+                name = str(layerParam.name).lower()
 
                 digits = [int(s) for s in name if s.isdigit()]
                 if len(digits)==0:
@@ -120,6 +120,8 @@ class NetFlowchart(Flowchart):
             node = self.createNode("Layer")
 
     def createNode(self, nodeType, name=None, pos=None):
+        if name is None:
+            name = nodeType.lower()
         if name in self._nodes:
             name2 = name
             n = 1
