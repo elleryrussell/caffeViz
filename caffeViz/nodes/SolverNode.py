@@ -1,17 +1,17 @@
 __author__ = 'err258'
 
+import os
+
 from caffe.proto.caffe_pb2 import SolverParameter as SolverProto
-from caffeViz.customParameterTypes import LParameter
 import pyqtgraph as pg
 from pyqtgraph import QtCore, QtGui
 from pyqtgraph.flowchart import Node
 import pyqtgraph.parametertree as ptree
-from caffeViz.protobufUtils import assign_proto, parsePrototxt
-import caffe
 import numpy as np
-import os
-
 import pyqtgraph.flowchart.library as fclib
+
+from caffeViz.customParameterTypes import LParameter
+from caffeViz.protobufUtils import assign_proto, parsePrototxt
 
 
 class SolverNode(Node):
@@ -77,45 +77,96 @@ class SolverNode(Node):
         return fileName
 
     def trainNet(self):
-        self.niter = self.param.child('max_iter').value()
+        niter = self.param.child('max_iter').value()
+        mode = self.param.child('solver_mode').value()
+        testInterval = self.param.child('test_interval').value()
+        # don't let caffe run the tests, we'll run them ourselves, so set test_interval to be greater than number
+        # of iterations
+        self.param.child('test_interval').setValue(niter + 1)
+        testIterParam = self.param.child('test_iter')
+        # stored as a repeated field
+        val = testIterParam.value()
+        if len(val) > 0:
+            testIter = val[0]
+        else:
+            testIter = 0
+
+        # don't let caffe run the tests, we'll run them ourselves, so set test_interval to be greater than number
+        # of iterations
+        testIters = int(np.ceil(niter / testInterval))
 
         os.chdir(os.path.dirname(self.filePath))
         netPathParam = self.param.child('net')
         netPathParam.setValue(os.path.basename(netPathParam.value()))
         tempFileName = self.writeProto()
 
-        solver = caffe.SGDSolver(tempFileName)
+        self.testIterParam.setValue(self.testInterval)
+        
+        solver = RemoteSolver(tempFileName, niter, testInterval, testIter, self.weights, mode)
 
-        if self.weights:
+        # when we get a response, we plot it
+        self.trainLoss = {outputName: np.zeros(niter) for outputName in solver.trainOutputs}
+        self.testLoss = {outputName: np.zeros(testIters) for outputName in solver.testLosses}
+        # assume any output which is only present in the test net is an accuracy layer
+        self.testAcc = {outputName: np.zeros(testIters) for outputName in solver.testAccuracies}
+
+        self.plotTrainData(it)
+
+
+
+    def stopTraining(self):
+        pass
+
+    def resumeTraining(self):
+        pass
+
+    def plotTrainData(self, it):
+        trainLoss = {outputName: lossArr[:it] for outputName, lossArr in self.trainLoss.items()}
+        testLoss = {outputName: lossArr[:it // self.testInterval] for outputName, lossArr in self.testLoss.items()}
+        testAcc = {outputName: lossArr[:it // self.testInterval] for outputName, lossArr in self.testAcc.items()}
+
+        # emit a signal to the plotting gods
+        outputDataDict = dict(trainLoss=trainLoss, testLoss=testLoss, testAcc=testAcc)
+        self.sigOutputDataChanged.emit(outputDataDict)
+
+fclib.registerNodeType(SolverNode, [('Layers',)])
+
+
+class RemoteSolver(object):
+    def __init__(self, filename, niter, testInterval, testIter, weights=None, mode=0):
+        import pyqtgraph.multiprocess as mp
+        # create a remote process
+        proc = mp.QtProcess()
+        # import this module in remote process
+        rcaffe = proc._import('caffe')
+
+        # this solver lives in the remote process
+        solver = rcaffe.SGDSolver(filename)
+
+        if weights is not None:
             # copy base weights for fine-tuning
-            solver.net.copy_from(self.weights)
+            solver.net.copy_from(weights)
 
         # solve straight through -- a better approach is to define a solving loop to
         # 1. take SGD steps
         # 2. score the model by the test net `solver.test_nets[0]`
         # 3. repeat until satisfied
         # losses will also be stored in the log
-        self.testInterval = self.param.child('test_interval').value()
-        # this is stored as a repeated field - TODO handle multiple?
-        testIterParam = self.param.child('test_iter')
-        val = testIterParam.value()
-        if len(val) > 0:
-            self.testIter = val[0]
+        # mode = self.param.child('solver_mode').value()
+        if mode == 1:
+            rcaffe.set_mode_gpu()
 
-        # don't let caffe run the tests, we'll run them ourselves, so set test_interval to be greater than number
-        # of iterations
-        self.param.child('test_interval').setValue(self.niter+1)
-        testIters = int(np.ceil(self.niter / self.testInterval))
-        self.testAcc = np.zeros(testIters)
-        self.testLoss = np.zeros(testIters)
-        # output = np.zeros((self.niter, 8, 10))
+        trainOutputs = solver.net.outputs
 
-        self.trainLoss = np.zeros(self.niter)
-        for it in range(self.niter):
+        for it in range(niter):
             solver.step(1)  # SGD by Caffe
+            print 'Iteration {}/{}'.format(it, niter)
 
             # store the train loss
-            self.trainLoss[it] = solver.net.blobs['loss'].data
+            # TODO get different loss layers for both train and test mode
+            trainLosses = {}
+            for outputName in trainOutputs:
+                trainLosses[outputName] = solver.net.blobs[outputName].data
 
             # TODO cool for visualizing the change in the net's predictions - make an option?
             # # store the output on the first test batch
@@ -126,41 +177,39 @@ class SolverNode(Node):
             # run a full test every so often
             # (Caffe can also do this for us and write to a log, but we show here
             #  how to do it directly in Python, where more complicated things are easier.)
-            if it % self.testInterval == 0:
+
+            if it % testInterval == 0 and it > 0:
                 print 'Iteration', it, 'testing...'
-                correct = 0
-                loss = 0
-                for testIt in range(self.testIter):
+                testLosses = {}
+                for outputName in trainOutputs:
+                    testLosses[outputName] = 0
+                accNames = [outputName for outputName in solver.test_nets[0].outputs if outputName not in trainOutputs]
+                testAccuracies = {outputName: 0 for outputName in accNames}
+                for testIt in range(testIter):
                     solver.test_nets[0].forward()
-                    loss += solver.test_nets[0].blobs['loss'].data
-                    correct += solver.test_nets[0].blobs['accuracy'].data
-                    # correct += sum(solver.test_nets[0].blobs['ip2'].data.argmax(1)
-                    #                == solver.test_nets[0].blobs['label'].data)
-                self.testAcc[it // self.testInterval] = correct / self.testIter
-                self.testLoss[it // self.testInterval] = loss / self.testIter
+                    for testDict in [testLosses, testAccuracies]:
+                        for lossName in testDict.keys():
+                            testDict[lossName] += solver.test_nets[0].blobs[lossName].data
+                # divide accuracies and losses by number of iterations
+                for testDict in [testLosses, testAccuracies]:
+                    for key in testDict.keys():
+                        testDict[key] /= testIter
 
-            self.plotTrainData(it)
-
-        # make sure to put the value back afterward so we don't mess up the prototxt if it's saved
-        self.testIterParam.setValue(self.testInterval)
-
-    def stopTraining(self):
+    def trainOutputs(self):
         pass
 
-    def resumeTraining(self):
+    def testLosses(self):
         pass
 
-    def plotTrainData(self, it):
-        trainLoss = self.trainLoss[0:it]
-        testLoss = self.testLoss[0:it//self.testInterval]
-        testAcc = self.testAcc[0:it//self.testInterval]
-
-        # emit a signal to the plotting gods
-        outputDataDict = dict(trainLoss=trainLoss, testLoss=testLoss, testAcc=testAcc)
-        self.sigOutputDataChanged.emit(outputDataDict)
+    def testAccuracies(self):
         pass
 
-fclib.registerNodeType(SolverNode, [('Layers',)])
+
+
+
+
+
+
 
 if __name__ == '__main__':
     pg.mkQApp()

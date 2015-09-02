@@ -28,6 +28,7 @@ class MainView(QtGui.QMainWindow):
         self.plots = {}
         self.plotNodes = {}
         self.plotDocks = {}
+        self.trainLossPlots = {}
 
         QtGui.QMainWindow.__init__(self)
 
@@ -97,10 +98,7 @@ class MainView(QtGui.QMainWindow):
         self.ui.saveSolverButton.pressed.connect(self.saveSolver)
         self.ui.trainParamTree.addParameters(self.solverNode.param)
         zeros = np.zeros(1)
-        plotItem = self.ui.trainGraphicsLayout.plotItem
-        self.trainLossPlot = plotItem.plot(zeros, pen='b', name='train loss')
-        self.testLossPlot = plotItem.plot(zeros, pen='g', name='test loss')
-        self.testAccPlot = plotItem.plot(zeros, pen='r', name='test accuracy')
+        self.trainPlotItem = self.ui.trainGraphicsLayout.plotItem
 
     def tabChanged(self, tabIndex):
         if tabIndex == 0:
@@ -178,12 +176,13 @@ class MainView(QtGui.QMainWindow):
         self.solverNode.writeProto(fileName)
 
     def updateTrainPlots(self, data):
-        trainLoss = data['trainLoss']
-        testLoss = data['testLoss']
-        testAcc = data['testAcc']
-        self.trainLossPlot.setData(trainLoss)
-        self.testLossPlot.setData(testLoss)
-        self.testAccPlot.setData(testAcc)
+        for lossName, color in dict(trainLoss='b', testLoss='g', testAcc='r').items():
+            for trainLossName, trainLossArr in data[lossName].items():
+                try:
+                    self.trainLossPlots[trainLossName].setData(trainLossArr)
+                except KeyError:
+                    self.trainLossPlots[trainLossName] = self.trainPlotItem.plot(trainLossArr, pen=color,
+                                                                                 name=trainLossName)
 
     def stopTraining(self):
         pass
