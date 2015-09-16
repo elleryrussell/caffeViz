@@ -3,7 +3,7 @@ from distutils.core import setup
 setup(
     name='caffeViz',
     version='1.0',
-    packages=['nodes'],
+    packages=['','caffeViz.Views','caffeViz.nodes','caffeViz.flowcharts'],
     url='',
     license='well...',
     author='ellery',
