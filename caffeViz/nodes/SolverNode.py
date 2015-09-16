@@ -79,7 +79,8 @@ class SolverNode(Node):
     def trainNet(self):
         niter = self.param.child('max_iter').value()
         mode = self.param.child('solver_mode').value()
-        testInterval = self.param.child('test_interval').value()
+        testIntervalParam = self.param.child('test_interval')
+        testInterval = testIntervalParam.value()
         # don't let caffe run the tests, we'll run them ourselves, so set test_interval to be greater than number
         # of iterations
         self.param.child('test_interval').setValue(niter + 1)
@@ -100,7 +101,8 @@ class SolverNode(Node):
         netPathParam.setValue(os.path.basename(netPathParam.value()))
         tempFileName = self.writeProto()
 
-        self.testIterParam.setValue(self.testInterval)
+        # change it back so we don't destroy the file
+        testIntervalParam.setValue(testInterval)
         
         solver = RemoteSolver(tempFileName, niter, testInterval, testIter, self.weights, mode)
 
@@ -110,7 +112,10 @@ class SolverNode(Node):
         # assume any output which is only present in the test net is an accuracy layer
         self.testAcc = {outputName: np.zeros(testIters) for outputName in solver.testAccuracies}
 
-        self.plotTrainData(it)
+        solver.sigTrainDataUpdated.connect(self.plotTrainData)
+        solver.sigTestDataUpdated.connect(self.plotTestData)
+
+        solver.train()
 
 
 
@@ -120,7 +125,7 @@ class SolverNode(Node):
     def resumeTraining(self):
         pass
 
-    def plotTrainData(self, it):
+    def plotTrainData(self, it, trainLossesDict):
         trainLoss = {outputName: lossArr[:it] for outputName, lossArr in self.trainLoss.items()}
         testLoss = {outputName: lossArr[:it // self.testInterval] for outputName, lossArr in self.testLoss.items()}
         testAcc = {outputName: lossArr[:it // self.testInterval] for outputName, lossArr in self.testAcc.items()}
@@ -129,10 +134,25 @@ class SolverNode(Node):
         outputDataDict = dict(trainLoss=trainLoss, testLoss=testLoss, testAcc=testAcc)
         self.sigOutputDataChanged.emit(outputDataDict)
 
+    def plotTestData(self, it, testLossesDict, testAccuraciesDict):
+        trainLoss = {outputName: lossArr[:it] for outputName, lossArr in self.trainLoss.items()}
+
+        testLoss = {outputName: lossArr[:it // self.testInterval] for outputName, lossArr in self.testLoss.items()}
+        testAcc = {outputName: lossArr[:it // self.testInterval] for outputName, lossArr in self.testAcc.items()}
+
+        # emit a signal to the plotting gods
+        outputDataDict = dict(trainLoss=trainLoss, testLoss=testLoss, testAcc=testAcc)
+        self.sigOutputDataChanged.emit(outputDataDict)
+
+
+
 fclib.registerNodeType(SolverNode, [('Layers',)])
 
 
-class RemoteSolver(object):
+class RemoteSolver(QtCore.QObject):
+    sigTrainDataUpdated = QtCore.Signal(object, object) # iteration, trainLoss Dictionary
+    sigTestDataUpdated = QtCore.Signal(object, object, object) # iteration, testLoss Dictionary, testAcc dictionary
+
     def __init__(self, filename, niter, testInterval, testIter, weights=None, mode=0):
         import pyqtgraph.multiprocess as mp
         # create a remote process
@@ -141,11 +161,13 @@ class RemoteSolver(object):
         rcaffe = proc._import('caffe')
 
         # this solver lives in the remote process
-        solver = rcaffe.SGDSolver(filename)
 
+        rfilename = proc.transfer(filename)
+        self.solver = rcaffe.SGDSolver(rfilename)
         if weights is not None:
+            rweights = proc.transfer(weights)
             # copy base weights for fine-tuning
-            solver.net.copy_from(weights)
+            self.solver.net.copy_from(rweights)
 
         # solve straight through -- a better approach is to define a solving loop to
         # 1. take SGD steps
@@ -156,17 +178,30 @@ class RemoteSolver(object):
         if mode == 1:
             rcaffe.set_mode_gpu()
 
-        trainOutputs = solver.net.outputs
+        self.rnet = self.solver.net
+        self.rnet._setProxyOptions(returnType='value')
+        self.rtestNet = self.solver.test_nets[0]
+        self.rtestNet._setProxyOptions(returnType='value')
+        self.trainOutputs = self.rnet.outputs
 
-        for it in range(niter):
-            solver.step(1)  # SGD by Caffe
-            print 'Iteration {}/{}'.format(it, niter)
+        self.niter = niter
+        self.testInterval = testInterval
+        self.testIter = testIter
+
+
+
+    def train(self):
+        for it in range(self.niter):
+            self.solver.step(1)  # SGD by Caffe
+            print 'Iteration {}/{}'.format(it, self.niter)
 
             # store the train loss
             # TODO get different loss layers for both train and test mode
             trainLosses = {}
-            for outputName in trainOutputs:
-                trainLosses[outputName] = solver.net.blobs[outputName].data
+            for outputName in self.trainOutputs:
+                trainLosses[outputName] = self.rnet.blobs[outputName].data
+
+            self.sigTrainDataUpdated.emit(it, trainLosses)
 
             # TODO cool for visualizing the change in the net's predictions - make an option?
             # # store the output on the first test batch
@@ -178,37 +213,31 @@ class RemoteSolver(object):
             # (Caffe can also do this for us and write to a log, but we show here
             #  how to do it directly in Python, where more complicated things are easier.)
 
-            if it % testInterval == 0 and it > 0:
+            if it % self.testInterval == 0 and it > 0:
                 print 'Iteration', it, 'testing...'
                 testLosses = {}
-                for outputName in trainOutputs:
+                for outputName in self.trainOutputs:
                     testLosses[outputName] = 0
-                accNames = [outputName for outputName in solver.test_nets[0].outputs if outputName not in trainOutputs]
+                accNames = [outputName for outputName in self.rtestNet.outputs if outputName not in self.trainOutputs]
                 testAccuracies = {outputName: 0 for outputName in accNames}
-                for testIt in range(testIter):
-                    solver.test_nets[0].forward()
+                for testIt in range(self.testIter):
+                    self.rtestNet.forward()
                     for testDict in [testLosses, testAccuracies]:
                         for lossName in testDict.keys():
-                            testDict[lossName] += solver.test_nets[0].blobs[lossName].data
+                            testDict[lossName] += self.rtestNet.blobs[lossName].data
                 # divide accuracies and losses by number of iterations
                 for testDict in [testLosses, testAccuracies]:
                     for key in testDict.keys():
-                        testDict[key] /= testIter
+                        testDict[key] /= self.testIter
 
-    def trainOutputs(self):
-        pass
+                self.sigTestDataUpdated.emit(it, testLosses, testAccuracies)
+
 
     def testLosses(self):
         pass
 
     def testAccuracies(self):
         pass
-
-
-
-
-
-
 
 
 if __name__ == '__main__':
