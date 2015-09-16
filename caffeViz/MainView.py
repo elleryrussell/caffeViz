@@ -191,34 +191,50 @@ class MainView(QtGui.QMainWindow):
         pass
 
 
+def main(modelFile=None, weightsFile=None, solverFile=None, filePath=None):
+    pg.mkQApp()
+
+    win = MainView(modelFile=modelFile, weightsFile=weightsFile, solverFile=solverFile, filePath=filePath)
+    win.show()
+
+    if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
+        QtGui.QApplication.instance().exec_()
+
+
 if __name__ == '__main__':
-    pg.mkQApp()  # layout.addWidget(w)
+    # layout.addWidget(w)
     # layout.addWidget(w.chartWidget, 0, 1)
+
     # # w.chartWidget.moveDock()
     # win.show()
 
-    import os.path
+    import sys
+    if len(sys.argv) > 1:
+        main(*sys.argv)
+    else:
+        import os.path
 
-    # net = caffe.Net('aprototxt.prototxt', caffe.TEST)
+        # net = caffe.Net('aprototxt.prototxt', caffe.TEST)
 
-    base_path = os.path.expanduser('~')
-    # model_dir = base_path + '/caffe/models/'
-    model_dir = base_path + '/caffeProjects/pascalContext/'
+        base_path = os.path.expanduser('~')
+        # model_dir = base_path + '/caffe/models/'
+        model_dir = base_path + '/caffeProjects/pascalContext/'
 
-    # net_dir = 'bvlc_reference_caffenet/'
-    # net_dir = 'pascalContextFCN8/'
-    net_dir = 'googleNet/'
+        # net_dir = 'bvlc_reference_caffenet/'
+        # net_dir = 'pascalContextFCN8/'
+        net_dir = 'googleNet/'
 
-    filePath = model_dir + net_dir
+        filePath = model_dir + net_dir
 
-    modelName = 'train_val.prototxt'
-    weightsName = 'bvlc_googlenet_iter_1400.caffemodel'
-    # weightsName = 'fcn-8s-pascalcontext.caffemodel'
-    # weightsName = 'bvlc_reference_caffenet.caffemodel'
-    solverName = 'solver.prototxt'
+        modelName = 'train_val.prototxt'
+        weightsName = 'bvlc_googlenet_iter_1400.caffemodel'
+        # weightsName = 'fcn-8s-pascalcontext.caffemodel'
+        # weightsName = 'bvlc_reference_caffenet.caffemodel'
+        solverName = 'solver.prototxt'
 
-    win = MainView(modelFile=modelName, weightsFile=weightsName, solverFile=solverName, filePath=filePath)
-    win.show()
+        main(modelFile=modelName, weightsFile=weightsName, solverFile=solverName, filePath=filePath)
+
+
     # win.ui.trainButton.click()
 
     # imageNode0 = win.fc.createNode('ImagePlot', pos=(4*120, 16*120))
@@ -237,5 +253,3 @@ if __name__ == '__main__':
     # win.displayCtrlUi.updateBtn.click()
 
 
-    if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
-        QtGui.QApplication.instance().exec_()
