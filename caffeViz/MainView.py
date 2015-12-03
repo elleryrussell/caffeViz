@@ -10,7 +10,6 @@ __author__ = 'err258'
 import pyqtgraph as pg
 from pyqtgraph import dockarea
 from pyqtgraph import QtCore, QtGui
-import sys
 import numpy as np
 
 from pyqtgraph.flowchart.library import getNodeTree
@@ -210,7 +209,7 @@ if __name__ == '__main__':
 
     import sys
     if len(sys.argv) > 1:
-        main(*sys.argv)
+        main(*sys.argv[1:])
     else:
         import os.path
 

@@ -1,10 +1,8 @@
 from collections import OrderedDict
-from google.protobuf.descriptor_pb2 import FieldDescriptorProto, DescriptorProto
+
+from google.protobuf.descriptor_pb2 import FieldDescriptorProto
 from google.protobuf.message import Message
 from google.protobuf import descriptor as _descriptor
-
-from pyqtgraph import QtCore
-
 from pyqtgraph.parametertree.Parameter import Parameter
 from pyqtgraph.parametertree.parameterTypes import GroupParameter, SimpleParameter, ListParameter
 
@@ -56,9 +54,19 @@ class LParameter(Parameter):
         default = fieldDescriptor.default_value
         if 'expanded' not in opts.keys():
             opts['expanded'] = False
+        self.hideDefaults = opts.pop('hideDefaults', True)
+
 
         Parameter.__init__(self, default=default, **opts)
 
+    def setToDefault(self):
+        if self.hideDefaults:
+            self.hide()
+        Parameter.setToDefault(self)
+
+    def setValue(self, value, blockSignal=None):
+        self.show()
+        Parameter.setValue(self, value, blockSignal=blockSignal)
     # def protoValue(self):
     #     if not self.valueIsDefault():
     #         protoMessage = self.fieldDescriptor.name
@@ -87,6 +95,8 @@ class LRepeatedParameter(GroupParameter, LParameter):
         for spec in value:
             child = self.addNew()
             child.setValue(spec)
+        self.show()
+        # LParameter.setValue(self, value, blockSignal=blockSignal)
 
     def valueIsDefault(self):
         """if child has any children always return False"""
@@ -102,13 +112,14 @@ class LRepeatedParameter(GroupParameter, LParameter):
     def setToDefault(self):
         for child in self.children():
             child.setToDefault()
+        LParameter.setToDefault(self)
 
     def value(self):
         return [child.value() for child in self.children()]
 
     def protoValue(self):
         for val in self.value():
-            pass
+            raise NotImplementedError
 
 
 registerLParameterType('repeated', LRepeatedParameter)
@@ -135,6 +146,8 @@ class LMessageParameter(GroupParameter, LParameter):
     def setToDefault(self):
         for child in self.children():
             child.setToDefault()
+        if self.hideDefaults:
+            self.hide()
 
     def value(self):
         childList = [(child.name(), child.value()) for child in self.children() if not child.valueIsDefault()]
@@ -144,6 +157,8 @@ class LMessageParameter(GroupParameter, LParameter):
         spec = value
         for field, value in spec.ListFields():
             self.child(field.name).setValue(value)
+        self.show()
+
             # pass
 
     def proto(self):

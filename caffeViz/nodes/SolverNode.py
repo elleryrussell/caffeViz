@@ -47,7 +47,7 @@ class SolverNode(Node):
             if proto is not None:
                 filePath = os.path.dirname(proto)
             else:
-                filePath = os.curdir()
+                filePath = os.curdir
         self.filePath = filePath
         self.weights = weightsFile
 

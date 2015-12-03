@@ -370,7 +370,8 @@ class LFlowchartWidget(FlowchartWidget):
                 val = val[:400] + "..."
             txt = "%s.proto = %s" % (layerNode.name(), val)
         self.hoverText.setPlainText(txt)
-#
+
+
 # class LFlowchartCtrlWidget(FlowchartCtrlWidget):
 #     def __init__(self, chart):
 #         FlowchartCtrlWidget.__init__(self, chart)

@@ -208,7 +208,7 @@ class LayerNode(Node):
         try:
             specifcParamName = _param_names[layerType] + '_param'
             specificFieldDescriptor = layerSpec.DESCRIPTOR.fields_by_name[specifcParamName]
-            child = LParameter.create(fieldDescriptor=specificFieldDescriptor)
+            child = LParameter.create(fieldDescriptor=specificFieldDescriptor, expanded=True)
             # add specific parameter type to top level param
             if self.specificParam is not None:
                 self.param.removeChild(self.specificParam)
