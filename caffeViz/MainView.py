@@ -1,28 +1,44 @@
 from pyqtgraph.widgets.FileDialog import FileDialog
-
-from caffeViz.Views import MainViewTemplate as MView
-from caffeViz.Views import DisplayControlWidgetTemplate as DispCtrl
-from caffeViz.flowcharts.flowcharts import NetFlowchart
-from caffeViz.nodes.SolverNode import SolverNode
-
-__author__ = 'err258'
-
 import pyqtgraph as pg
 from pyqtgraph import dockarea
 from pyqtgraph import QtCore, QtGui
-import numpy as np
-
 from pyqtgraph.flowchart.library import getNodeTree
+
+from caffeViz.views import MainViewTemplate as MView
+from caffeViz.views import DisplayControlWidgetTemplate as DispCtrl
+from caffeViz.flowcharts import NetFlowchart
+from caffeViz.nodes.SolverNode import SolverNode
+
+__author__ = 'ellery'
+
 displayNodes = tuple(getNodeTree()['Display'].values())
 
-class MainView(QtGui.QMainWindow):
-    def __init__(self, modelFile=None, weightsFile=None, solverFile=None, filePath=None):
-        if filePath is not None:
-            modelFile = filePath + modelFile
-            weightsFile = filePath + weightsFile
-            solverFile = filePath + solverFile
 
-        self.filePath = filePath
+class MainView(QtGui.QMainWindow):
+    """The main view of the application"""
+
+    def __init__(self, modelFile=None, weightsFile=None, solverFile=None, directory=None):
+        """
+        The top-level GUI object, containing three main tabs:
+        Configure: for graphically editing a network backed by a caffe prototxt file
+        Train: for monitoring the training process and plotting the accuracies
+        Test: for visualizing the activations at different points in a (hopefully) trained network
+        :param modelFile: str
+            The .prototxt file defining the network architecture
+        :param weightsFile: str
+            The .caffemodel file containing the learned network weights
+        :param solverFile: str
+            The .prototxt file defining the solver parameters
+        :param directory: str
+            The base directory containing the files, for relative file paths
+        :return:
+        """
+        if directory is not None:
+            modelFile = directory + modelFile
+            weightsFile = directory + weightsFile
+            solverFile = directory + solverFile
+
+        self.directory = directory
 
         self.plots = {}
         self.plotNodes = {}
@@ -47,15 +63,10 @@ class MainView(QtGui.QMainWindow):
         self.setCentralWidget(cw)
 
         self.fc = NetFlowchart(prototxt=modelFile, weights=weightsFile)
-        self.fc.sigChartChanged.connect(self.fc.configNode)
+        self.fc.sigChartChanged.connect(self.fc.chartNodeEdited)
         w = self.fc.widget()
 
-        # QtGui.QGridLayout(self.ui.flowchartCtrlWidget)
-        # QtGui.QGridLayout(self.ui.flowchartCtrlWidget_2)
-        # QtGui.QGridLayout(self.ui.flowchartWidget)
-        # QtGui.QGridLayout(self.ui.flowchartWidget_2)
         self.ui.splitter.addWidget(self.ui.displayLayout)
-        # QtGui.QGridLayout(self.ui.plotWidget)
 
         # self.plotLabel = QtGui.QLabel()
         # self.plotLabelDock = dockarea.Dock('label')
@@ -88,7 +99,7 @@ class MainView(QtGui.QMainWindow):
         self.displayControlDock.addWidget(formWidget)
         self.ui.displayArea.addDock(self.displayControlDock, position='top')
 
-        self.solverNode = SolverNode('solver', solverFile, weightsFile, filePath)
+        self.solverNode = SolverNode('solver', solverFile, weightsFile, directory)
         self.solverNode.sigOutputDataChanged.connect(self.updateTrainPlots)
         self.ui.trainButton.pressed.connect(self.solverNode.trainNet)
         self.ui.stopButton.pressed.connect(self.solverNode.stopTraining)
@@ -96,10 +107,10 @@ class MainView(QtGui.QMainWindow):
         self.ui.loadSolverButton.pressed.connect(self.loadSolver)
         self.ui.saveSolverButton.pressed.connect(self.saveSolver)
         self.ui.trainParamTree.addParameters(self.solverNode.param)
-        zeros = np.zeros(1)
         self.trainPlotItem = self.ui.trainGraphicsLayout.plotItem
 
     def tabChanged(self, tabIndex):
+        """handle moving the flowchart around"""
         if tabIndex == 0:
             self.setTab0()
         elif tabIndex == 2:
@@ -114,10 +125,12 @@ class MainView(QtGui.QMainWindow):
     def setTab2(self):
         self.ui.flowchartCtrlWidget_2.layout().addWidget(self.fc.widget())
         self.ui.flowchartWidget_2.layout().addWidget(self.fc.widget().chartWidget)
-        # self.ui.plotWidget.layout().addWidget(self.plotLabel)
         self.tabWidget.update()
 
     def addPlot(self, plotNode):
+        """
+        add an connect a plot
+        """
         name = plotNode.name()
         plot = pg.PlotWidget(name=name)
         self.plots[name] = plot
@@ -147,12 +160,10 @@ class MainView(QtGui.QMainWindow):
     def loadSolver(self, fileName=None, startDir=None):
         if fileName is None:
             if startDir is None:
-                startDir = self.filePath
+                startDir = self.directory
             if startDir is None:
                 startDir = '.'
             self.fileDialog = FileDialog(None, "Load Flowchart..", startDir, "Protobuf (*.prototxt)")
-            # self.fileDialog.setFileMode(QtGui.QFileDialog.AnyFile)
-            # self.fileDialog.setAcceptMode(QtGui.QFileDialog.AcceptSave)
             self.fileDialog.show()
             self.fileDialog.fileSelected.connect(self.loadSolver)
             return
@@ -162,7 +173,7 @@ class MainView(QtGui.QMainWindow):
     def saveSolver(self, fileName=None, startDir=None, suggestedFileName='solver.prototxt'):
         if fileName is None:
             if startDir is None:
-                startDir = self.filePath
+                startDir = self.directory
             if startDir is None:
                 startDir = '.'
             self.fileDialog = FileDialog(None, "Save Solver..", startDir, "Prototxt (*.prototxt)")
@@ -193,7 +204,7 @@ class MainView(QtGui.QMainWindow):
 def main(modelFile=None, weightsFile=None, solverFile=None, filePath=None):
     pg.mkQApp()
 
-    win = MainView(modelFile=modelFile, weightsFile=weightsFile, solverFile=solverFile, filePath=filePath)
+    win = MainView(modelFile=modelFile, weightsFile=weightsFile, solverFile=solverFile, directory=filePath)
     win.show()
 
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
@@ -216,19 +227,19 @@ if __name__ == '__main__':
         # net = caffe.Net('aprototxt.prototxt', caffe.TEST)
 
         base_path = os.path.expanduser('~')
-        # model_dir = base_path + '/caffe/models/'
-        model_dir = base_path + '/caffeProjects/pascalContext/'
+        model_dir = base_path + '/caffe/models/'
+        # model_dir = base_path + '/caffeProjects/pascalContext/'
 
-        # net_dir = 'bvlc_reference_caffenet/'
+        net_dir = 'bvlc_reference_caffenet/'
         # net_dir = 'pascalContextFCN8/'
-        net_dir = 'googleNet/'
+        # net_dir = 'googleNet/'
 
         filePath = model_dir + net_dir
 
         modelName = 'train_val.prototxt'
-        weightsName = 'bvlc_googlenet_iter_1400.caffemodel'
+        # weightsName = 'bvlc_googlenet_iter_1400.caffemodel'
         # weightsName = 'fcn-8s-pascalcontext.caffemodel'
-        # weightsName = 'bvlc_reference_caffenet.caffemodel'
+        weightsName = 'bvlc_reference_caffenet.caffemodel'
         solverName = 'solver.prototxt'
 
         main(modelFile=modelName, weightsFile=weightsName, solverFile=solverName, filePath=filePath)

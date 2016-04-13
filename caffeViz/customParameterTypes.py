@@ -11,6 +11,7 @@ __author__ = 'ellery'
 LPARAM_TYPES = {}
 LPARAM_NAMES = {}
 
+
 def registerLParameterType(name, cls, override=False):
     global LPARAM_TYPES
     if name in LPARAM_TYPES and not override:
@@ -67,9 +68,6 @@ class LParameter(Parameter):
     def setValue(self, value, blockSignal=None):
         self.show()
         Parameter.setValue(self, value, blockSignal=blockSignal)
-    # def protoValue(self):
-    #     if not self.valueIsDefault():
-    #         protoMessage = self.fieldDescriptor.name
 
 
 class LRepeatedParameter(GroupParameter, LParameter):
@@ -133,9 +131,6 @@ class LMessageParameter(GroupParameter, LParameter):
                     if '_param' not in mfield.name]
 
         GroupParameter.__init__(self, children=children, **self.opts)
-        # if self.value() is not None:
-        #     paramsList = makeParamList(self.value())
-        #     self.addChild(paramsList)
 
     def valueIsDefault(self):
         for child in self.children():
@@ -164,10 +159,6 @@ class LMessageParameter(GroupParameter, LParameter):
     def proto(self):
         fd = self.fieldDescriptor
         assert isinstance(fd, FieldDescriptorProto)
-
-        # def setValue(self, value, blockSignal=None):
-        #     for child in self.children():
-        #         child.setValue(value.name.value)
 
 
 registerLParameterType('message', LMessageParameter)

@@ -1,10 +1,9 @@
 __author__ = 'ellery'
 
 from contextlib import contextmanager
-
-import numpy as np
 from itertools import islice
 
+import numpy as np
 
 
 @contextmanager
@@ -23,6 +22,7 @@ def slotDisconnected(signal, slot):
     yield
     signal.connect(slot)
 
+
 @contextmanager
 def signalsBlocked(qObject):
     """
@@ -39,6 +39,7 @@ def signalsBlocked(qObject):
     yield
     qObject.blockSignals(False)
 
+
 def split_every(n, iterable):
     """
     split an iterable into batches
@@ -51,6 +52,7 @@ def split_every(n, iterable):
     while piece:
         yield piece
         piece = list(islice(i, n))
+
 
 class ROI(object):
     def __init__(self, r0=None, r1=None, rc=None, roi_radius=None):

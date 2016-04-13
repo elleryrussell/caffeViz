@@ -3,10 +3,9 @@ from google.protobuf import text_format
 
 __author__ = 'err258'
 
+
 def assign_proto(proto, param):
-    """Assign a Python object to a protobuf message, based on the Python
-    type (in recursive fashion). Lists become repeated fields/messages, dicts
-    become messages, and other types are assigned directly."""
+    """Assign a Parameter to a protobuf message, based on the Parameter type (in recursive fashion)"""
 
     # repeated fields type
     if param.type() == 'repeated':
@@ -39,6 +38,7 @@ def _readProtoNetFile(filepath):
     net_config = NetProto()
 
     return _readProtoFile(filepath, net_config)
+
 
 def _readProtoSolverFile(filepath):
     solver_config = SolverProto()

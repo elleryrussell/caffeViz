@@ -10,7 +10,7 @@ __author__ = 'ellery'
 # from caffe.proto import caffe_pb2
 from caffe.net_spec import _param_names
 
-_param_names['Deconvolution']='convolution'
+_param_names['Deconvolution'] = 'convolution'
 
 from pyqtgraph.flowchart import Node
 import pyqtgraph.flowchart.library as fclib
@@ -20,6 +20,7 @@ from pyqtgraph.Qt import QtCore
 import pyqtgraph as pg
 
 # import numpy as np
+
 
 class LayerNode(Node):
     """PsuedoNode for caffe layer"""
@@ -72,17 +73,6 @@ class LayerNode(Node):
 
     def ctrlWidget(self):
         return self.ui
-
-    # def process(self, dataIn, display=True):
-    #     # CtrlNode has created self.ctrls, which is a dict containing {ctrlName: widget}
-    #     sigma = self.ctrls['sigma'].value()
-    #     strength = self.ctrls['strength'].value()
-    #     output = dataIn - (strength * pg.gaussianFilter(dataIn, (sigma, sigma)))
-    #     return {'dataOut': output}
-    #
-    # def getParamList(self):
-    #     fieldDescriptors = [field for field in self.generalParams().DESCRIPTOR.fields if '_param' not in field.name]
-    #     return [makeParamList(fd) for fd in fieldDescriptors]
 
     def configFromLayerSpec(self, layerSpec):
         with self.param.treeChangeBlocker():

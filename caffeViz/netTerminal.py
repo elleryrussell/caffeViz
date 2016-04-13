@@ -5,6 +5,7 @@ from pyqtgraph.Point import Point
 
 
 class NetConnectionItem(ConnectionItem):
+    """Override connection item to use cubic spline paths"""
     def generatePath(self, start, stop, vertical=True):
         path = QtGui.QPainterPath()
         path.moveTo(start)
@@ -14,9 +15,11 @@ class NetConnectionItem(ConnectionItem):
             path = ConnectionItem.generatePath(self, start, stop)
         return path
 
+
 class NetTerminal(Terminal):
+    """Subclass Terminal to override naming behavior for inputs and outputs"""
+
     def name(self):
-        # print self._name[:-len('.o')]
         return self._name[:-len('.o')]
 
     def rename(self, name):

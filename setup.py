@@ -3,9 +3,9 @@ from distutils.core import setup
 setup(
     name='caffeViz',
     version='1.0',
-    packages=['caffeViz','caffeViz.Views','caffeViz.nodes','caffeViz.flowcharts'],
+    packages=['caffeViz', 'caffeViz.views', 'caffeViz.nodes', 'caffeViz.flowcharts'],
     url='',
-    license='well...',
+    license='MIT',
     author='ellery',
     author_email='ellery.rrussell@gmail.com',
     description='tools for caffe',
